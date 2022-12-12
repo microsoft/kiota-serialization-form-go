@@ -49,7 +49,7 @@ func TestWriteTimeValue(t *testing.T) {
 	serializer.WriteTimeValue("key", &value)
 	result, err := serializer.GetSerializedContent()
 	assert.Nil(t, err)
-	assert.Equal(t, fmt.Sprintf("key=%v", value.Format(time.RFC3339)), string(result[:]))
+	assert.Equal(t, "key=2006-01-02T15%3A04%3A05-07%3A00", string(result[:]))
 }
 
 func TestWriteISODurationValue(t *testing.T) {
