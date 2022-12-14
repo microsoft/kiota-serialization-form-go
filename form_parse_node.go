@@ -43,7 +43,7 @@ func loadFields(value string) map[string]string {
 			if result[key] == "" {
 				result[key] = keyValue[1]
 			} else {
-				result[key] += keyValue[1]
+				result[key] += "," + keyValue[1]
 			}
 		}
 	}
