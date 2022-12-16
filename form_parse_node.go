@@ -25,21 +25,28 @@ func NewFormParseNode(content []byte) (*FormParseNode, error) {
 		return nil, errors.New("content is empty")
 	}
 	rawValue := string(content)
+	fields, err := loadFields(rawValue)
+	if err != nil {
+		return nil, err
+	}
 	return &FormParseNode{
 		value:  rawValue,
-		fields: loadFields(rawValue),
+		fields: fields,
 	}, nil
 }
-func loadFields(value string) map[string]string {
+func loadFields(value string) (map[string]string, error) {
 	result := make(map[string]string)
 	if len(value) == 0 {
-		return result
+		return result, nil
 	}
 	parts := strings.Split(value, "&")
 	for _, part := range parts {
 		keyValue := strings.Split(part, "=")
 		if len(keyValue) == 2 {
-			key := keyValue[0]
+			key, err := sanitizeKey(keyValue[0])
+			if err != nil {
+				return nil, err
+			}
 			if result[key] == "" {
 				result[key] = keyValue[1]
 			} else {
@@ -47,7 +54,17 @@ func loadFields(value string) map[string]string {
 			}
 		}
 	}
-	return result
+	return result, nil
+}
+func sanitizeKey(key string) (string, error) {
+	if key == "" {
+		return "", nil
+	}
+	res, err := url.QueryUnescape(key)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(res, " "), nil
 }
 
 // GetChildNode returns a new parse node for the given identifier.
@@ -55,7 +72,11 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if index == "" {
 		return nil, errors.New("index is empty")
 	}
-	fieldValue := n.fields[index]
+	key, err := sanitizeKey(index)
+	if err != nil {
+		return nil, err
+	}
+	fieldValue := n.fields[key]
 	if fieldValue == "" {
 		return nil, nil
 	}
