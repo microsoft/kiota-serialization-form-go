@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
 
 ### Changed
+
+## [0.2.0] - 2022-12-16
+
+### Changed
+
+- Fixed key encoding
 
 ## [0.1.0] - 2022-12-15
 
 ### Added
 
 - Initial release of the package.
-

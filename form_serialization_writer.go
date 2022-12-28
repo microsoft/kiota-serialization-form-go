@@ -32,7 +32,7 @@ func (w *FormSerializationWriter) writeStringValue(value string) {
 	w.writeRawValue(value)
 }
 func (w *FormSerializationWriter) writePropertyName(key string) {
-	w.writer = append(w.writer, key+"=")
+	w.writer = append(w.writer, url.QueryEscape(key)+"=")
 }
 func (w *FormSerializationWriter) writePropertySeparator() {
 	w.writer = append(w.writer, "&")
