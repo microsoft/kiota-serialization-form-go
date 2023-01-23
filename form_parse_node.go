@@ -4,6 +4,7 @@ package formserialization
 import (
 	"encoding/base64"
 	"errors"
+	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,8 +16,10 @@ import (
 
 // FormParseNode is a ParseNode implementation for JSON.
 type FormParseNode struct {
-	value  string
-	fields map[string]string
+	value                     string
+	fields                    map[string]string
+	onBeforeAssignFieldValues absser.ParsableAction
+	onAfterAssignFieldValues  absser.ParsableAction
 }
 
 // NewFormParseNode creates a new FormParseNode.
@@ -80,9 +83,13 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if fieldValue == "" {
 		return nil, nil
 	}
-	return &FormParseNode{
-		value: fieldValue,
-	}, nil
+
+	node := &FormParseNode{
+		value:                     fieldValue,
+		onBeforeAssignFieldValues: n.GetOnBeforeAssignFieldValues(),
+		onAfterAssignFieldValues:  n.GetOnAfterAssignFieldValues(),
+	}
+	return node, nil
 }
 
 // GetObjectValue returns the Parsable value from the node.
@@ -97,7 +104,7 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 	if err != nil {
 		return nil, err
 	}
-	//TODO on before when implementing backing store
+	abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), result)
 	fields := result.GetFieldDeserializers()
 	if len(n.fields) != 0 {
 		itemAsHolder, isHolder := result.(absser.AdditionalDataHolder)
@@ -131,7 +138,7 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 			}
 		}
 	}
-	//TODO on after when implementing backing store
+	abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), result)
 	return result, nil
 }
 
@@ -365,4 +372,22 @@ func (n *FormParseNode) GetRawValue() (interface{}, error) {
 	}
 	res := n.value
 	return &res, nil
+}
+
+func (n *FormParseNode) GetOnBeforeAssignFieldValues() absser.ParsableAction {
+	return n.onBeforeAssignFieldValues
+}
+
+func (n *FormParseNode) SetOnBeforeAssignFieldValues(action absser.ParsableAction) error {
+	n.onBeforeAssignFieldValues = action
+	return nil
+}
+
+func (n *FormParseNode) GetOnAfterAssignFieldValues() absser.ParsableAction {
+	return n.onAfterAssignFieldValues
+}
+
+func (n *FormParseNode) SetOnAfterAssignFieldValues(action absser.ParsableAction) error {
+	n.onAfterAssignFieldValues = action
+	return nil
 }

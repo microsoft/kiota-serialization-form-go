@@ -3,6 +3,7 @@ package formserialization
 import (
 	"encoding/base64"
 	"errors"
+	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,8 +16,11 @@ import (
 
 // FormSerializationWriter implements SerializationWriter for URI form encoded.
 type FormSerializationWriter struct {
-	writer []string
-	depth  int
+	writer                     []string
+	depth                      int
+	onBeforeAssignFieldValues  absser.ParsableAction
+	onAfterAssignFieldValues   absser.ParsableAction
+	onStartObjectSerialization absser.ParsableWriter
 }
 
 // NewFormSerializationWriter creates a new instance of the FormSerializationWriter.
@@ -231,25 +235,31 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 		if key != "" {
 			w.writePropertyName(key)
 		}
-		//TODO onBefore for backing store
+		abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), item)
 		if item != nil {
-			//TODO onStart for backing store
-			err := item.Serialize(w)
+			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), item, w)
+			if err != nil {
+				return err
+			}
+			err = item.Serialize(w)
 
-			//TODO onAfter for backing store
+			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), item)
 			if err != nil {
 				return err
 			}
 		}
 
 		for _, additionalValue := range additionalValuesToMerge {
-			//TODO onBefore for backing store
-			//TODO onStart for backing store
-			err := additionalValue.Serialize(w)
+			abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), additionalValue)
+			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), additionalValue, w)
 			if err != nil {
 				return err
 			}
-			//TODO onAfter for backing store
+			err = additionalValue.Serialize(w)
+			if err != nil {
+				return err
+			}
+			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), additionalValue)
 		}
 
 		if key != "" {
@@ -438,5 +448,46 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 // Close clears the internal buffer.
 func (w *FormSerializationWriter) Close() error {
 	w.writer = make([]string, 0)
+	return nil
+}
+
+func (w *FormSerializationWriter) WriteNullValue(key string) error {
+	if key != "" {
+		w.writePropertyName(key)
+	}
+
+	w.writeRawValue("null")
+
+	if key != "" {
+		w.writePropertySeparator()
+	}
+
+	return nil
+}
+
+func (w *FormSerializationWriter) GetOnBeforeSerialization() absser.ParsableAction {
+	return w.onBeforeAssignFieldValues
+}
+
+func (w *FormSerializationWriter) SetOnBeforeSerialization(action absser.ParsableAction) error {
+	w.onBeforeAssignFieldValues = action
+	return nil
+}
+
+func (w *FormSerializationWriter) GetOnAfterObjectSerialization() absser.ParsableAction {
+	return w.onAfterAssignFieldValues
+}
+
+func (w *FormSerializationWriter) SetOnAfterObjectSerialization(action absser.ParsableAction) error {
+	w.onAfterAssignFieldValues = action
+	return nil
+}
+
+func (w *FormSerializationWriter) GetOnStartObjectSerialization() absser.ParsableWriter {
+	return w.onStartObjectSerialization
+}
+
+func (w *FormSerializationWriter) SetOnStartObjectSerialization(writer absser.ParsableWriter) error {
+	w.onStartObjectSerialization = writer
 	return nil
 }
