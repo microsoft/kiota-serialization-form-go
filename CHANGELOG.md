@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.3.0] - 2023-01-26
+
+### Changed
+
+- Added support for backing store.
+
 ## [0.2.0] - 2022-12-16
 
 ### Changed
