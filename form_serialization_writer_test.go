@@ -187,15 +187,17 @@ func TestJsonSerializationWriter_WriteNullValue(t *testing.T) {
 func TestJsonSerializationWriter(t *testing.T) {
 	serializer := NewFormSerializationWriter()
 	countBefore := 0
-	onBefore := func(parsable absser.Parsable) {
+	onBefore := func(parsable absser.Parsable) error {
 		countBefore++
+		return nil
 	}
 	err := serializer.SetOnBeforeSerialization(onBefore)
 	assert.NoError(t, err)
 
 	countAfter := 0
-	onAfter := func(parsable absser.Parsable) {
+	onAfter := func(parsable absser.Parsable) error {
 		countAfter++
+		return nil
 	}
 	err = serializer.SetOnAfterObjectSerialization(onAfter)
 	assert.NoError(t, err)

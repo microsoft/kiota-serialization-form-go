@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/microsoft/kiota-abstractions-go v0.16.0
+	github.com/microsoft/kiota-abstractions-go v0.17.0
 	github.com/stretchr/testify v1.8.1
 )
 
@@ -20,4 +20,3 @@ require (
 	go.opentelemetry.io/otel/trace v1.11.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
