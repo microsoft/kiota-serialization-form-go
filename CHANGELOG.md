@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.4.0] - 2023-03-01
+
+### Added
+
+- Adds support for serialization of collections by serialization writer and parsenode.
+
 ## [0.3.0] - 2023-01-26
 
 ### Changed
