@@ -271,15 +271,7 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 
 // WriteCollectionOfObjectValues writes a collection of Parsable values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfObjectValues(key string, collection []absser.Parsable) error {
-	if collection != nil && len(collection) > 0 {
-		for _, item := range collection {
-			err := w.WriteObjectValue(key, item)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return errors.New("collections serialization is not supported with FormSerializationWriter")
 }
 
 func writeCollectionOfPrimitiveValues[T interface{}](key string, writer func(string, *T) error, collection []T) error {
