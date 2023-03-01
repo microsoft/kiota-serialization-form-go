@@ -169,9 +169,13 @@ func TestWriteMultipleCollections(t *testing.T) {
 	serializer.WriteStringValue("key", &value)
 
 	adlData := map[string]interface{}{
-		"addStrings": []string{"str1", "str2"},
-		"addInt32":   []int32{34, 56},
-		"addInt64":   []int64{1, 2},
+		"string":  []string{"str1", "str2"},
+		"int32":   []int32{34, 56},
+		"bool":    []bool{true, false},
+		"uint8":   []uint8{1, 2},
+		"float32": []float32{32.0, 34.1},
+		"float64": []float64{100.1, 400.1},
+		"int64":   []int64{567, 765},
 	}
 	serializer.WriteAdditionalData(adlData)
 
@@ -180,12 +184,20 @@ func TestWriteMultipleCollections(t *testing.T) {
 	assert.Nil(t, err)
 	resultVal := string(result[:])
 	assert.Contains(t, resultVal, "key=value&")
-	assert.Contains(t, resultVal, "addStrings=str1&")
-	assert.Contains(t, resultVal, "addStrings=str2")
-	assert.Contains(t, resultVal, "addInt32=34")
-	assert.Contains(t, resultVal, "addInt32=56")
-	assert.Contains(t, resultVal, "addInt64=1")
-	assert.Contains(t, resultVal, "addInt64=2")
+	assert.Contains(t, resultVal, "string=str1&")
+	assert.Contains(t, resultVal, "string=str2")
+	assert.Contains(t, resultVal, "int32=34")
+	assert.Contains(t, resultVal, "int32=56")
+	assert.Contains(t, resultVal, "bool=true")
+	assert.Contains(t, resultVal, "bool=false")
+	assert.Contains(t, resultVal, "uint8=1")
+	assert.Contains(t, resultVal, "uint8=2")
+	assert.Contains(t, resultVal, "float32=32")
+	assert.Contains(t, resultVal, "float32=34")
+	assert.Contains(t, resultVal, "float64=100.1")
+	assert.Contains(t, resultVal, "float64=400.1")
+	assert.Contains(t, resultVal, "int64=567")
+	assert.Contains(t, resultVal, "int64=765")
 }
 
 func TestEscapesNewLinesInStrings(t *testing.T) {
