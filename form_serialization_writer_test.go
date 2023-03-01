@@ -2,6 +2,7 @@ package formserialization
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/microsoft/kiota-serialization-form-go/internal"
 	"testing"
 	"time"
@@ -161,6 +162,50 @@ func TestWriteMultipleTypes(t *testing.T) {
 	assert.Contains(t, string(result[:]), "add2=pointer&")
 	assert.Contains(t, string(result[:]), "key2=value2")
 	assert.Equal(t, len("key=value&add1=string&add2=pointer&key2=value2"), len(string(result[:])))
+}
+
+func TestWriteMultipleCollections(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+	value := "value"
+	serializer.WriteStringValue("key", &value)
+
+	adlData := map[string]interface{}{
+		"string":      []string{"str1", "str2"},
+		"int32":       []int32{34, 56},
+		"bool":        []bool{true, false},
+		"uint8":       []uint8{1, 2},
+		"float32":     []float32{32.0, 34.1},
+		"float64":     []float64{100.1, 400.1},
+		"int64":       []int64{567, 765},
+		"time":        []time.Time{time.Now()},
+		"timeonly":    []*absser.ISODuration{absser.NewDuration(0, 0, 1, 0, 0, 0, 0)},
+		"dateonly":    []*absser.DateOnly{absser.NewDateOnly(time.Now())},
+		"isoduration": []*absser.ISODuration{absser.NewDuration(0, 0, 1, 0, 0, 0, 0)},
+		"uuid":        []uuid.UUID{uuid.New()},
+		"base64":      []int64{567, 765},
+		"int8":        []int8{2, 3},
+	}
+	serializer.WriteAdditionalData(adlData)
+
+	result, err := serializer.GetSerializedContent()
+
+	assert.Nil(t, err)
+	resultVal := string(result[:])
+	assert.Contains(t, resultVal, "key=value&")
+	assert.Contains(t, resultVal, "string=str1&")
+	assert.Contains(t, resultVal, "string=str2")
+	assert.Contains(t, resultVal, "int32=34")
+	assert.Contains(t, resultVal, "int32=56")
+	assert.Contains(t, resultVal, "bool=true")
+	assert.Contains(t, resultVal, "bool=false")
+	assert.Contains(t, resultVal, "uint8=1")
+	assert.Contains(t, resultVal, "uint8=2")
+	assert.Contains(t, resultVal, "float32=32")
+	assert.Contains(t, resultVal, "float32=34")
+	assert.Contains(t, resultVal, "float64=100.1")
+	assert.Contains(t, resultVal, "float64=400.1")
+	assert.Contains(t, resultVal, "int64=567")
+	assert.Contains(t, resultVal, "int64=765")
 }
 
 func TestEscapesNewLinesInStrings(t *testing.T) {

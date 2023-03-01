@@ -1,14 +1,13 @@
 package formserialization
 
 import (
-	testing "testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/microsoft/kiota-serialization-form-go/internal"
 
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
-	assert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetRawValue(t *testing.T) {
@@ -26,6 +25,92 @@ func TestGetRawValue(t *testing.T) {
 	value, err := someProp.GetRawValue()
 	assert.Equal(t, "200", *value.(*string))
 }
+
+func TestGetCollectionOfPrimitiveValues(t *testing.T) {
+	source := `id=2&status=200&item=1&item=2&item=3`
+	sourceArray := []byte(source)
+	parseNode, err := NewFormParseNode(sourceArray)
+	require.NoError(t, err)
+	someProp, err := parseNode.GetChildNode("item")
+	require.NoError(t, err)
+
+	value, err := someProp.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+
+	expected := []interface{}{ref(int32(1)), ref(int32(2)), ref(int32(3))}
+	assert.Equal(t, expected, value)
+}
+
+func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
+	assert.Equal(t,
+		[]interface{}{ref("milk"), ref("soda")},
+		getCollectionValues("id=2&item=milk&item=soda", "item", "string"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(true), ref(false)},
+		getCollectionValues("id=2&item=true&item=false", "item", "bool"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(int8(1)), ref(int8(2)), ref(int8(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "uint8"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(byte(1)), ref(byte(2)), ref(byte(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "byte"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(float32(1)), ref(float32(2)), ref(float32(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "float32"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(float64(1)), ref(float64(2)), ref(float64(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "float64"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(float64(1)), ref(float64(2)), ref(float64(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "float64"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(int32(1)), ref(int32(2)), ref(int32(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int32"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(int64(1)), ref(int64(2)), ref(int64(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int64"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "time"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "timeonly"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "dateonly"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "isoduration"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "uuid"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "base64"),
+	)
+}
+
+func getCollectionValues(source string, indexName string, targetType string) []interface{} {
+	sourceArray := []byte(source)
+	parseNode, _ := NewFormParseNode(sourceArray)
+	someProp, _ := parseNode.GetChildNode(indexName)
+
+	value, _ := someProp.GetCollectionOfPrimitiveValues(targetType)
+	return value
+}
+
+func ref[T interface{}](t T) *T {
+	return &t
+}
+
 func TestFormParseNodeHonoursInterface(t *testing.T) {
 	instance := &FormParseNode{}
 	assert.Implements(t, (*absser.ParseNode)(nil), instance)
