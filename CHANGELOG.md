@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.9.0] - 2023-03-01
+
+### Changed
+
+- Update version number to 0.9.0. Fixes error in release number
+
 ## [0.4.0] - 2023-03-01
 
 ### Added
