@@ -26,6 +26,28 @@ func TestGetRawValue(t *testing.T) {
 	value, err := someProp.GetRawValue()
 	assert.Equal(t, "200", *value.(*string))
 }
+
+func TestGetCollectionOfPrimitiveValues(t *testing.T) {
+	source := `id=2&status=200&item=1&item=2&item=3`
+	sourceArray := []byte(source)
+	parseNode, err := NewFormParseNode(sourceArray)
+	if err != nil {
+		t.Errorf("Error creating parse node: %s", err.Error())
+	}
+	someProp, err := parseNode.GetChildNode("item")
+	require.NoError(t, err)
+
+	value, err := someProp.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+
+	expected := []interface{}{ref(int32(1)), ref(int32(2)), ref(int32(3))}
+	assert.Equal(t, expected, value)
+}
+
+func ref[T interface{}](t T) *T {
+	return &t
+}
+
 func TestFormParseNodeHonoursInterface(t *testing.T) {
 	instance := &FormParseNode{}
 	assert.Implements(t, (*absser.ParseNode)(nil), instance)

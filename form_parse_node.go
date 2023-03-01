@@ -149,7 +149,63 @@ func (n *FormParseNode) GetCollectionOfObjectValues(ctor absser.ParsableFactory)
 
 // GetCollectionOfPrimitiveValues returns the collection of primitive values from the node.
 func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]interface{}, error) {
-	return nil, errors.New("collections are not supported in form serialization")
+	if n == nil || n.value == "" {
+		return nil, nil
+	}
+	if targetType == "" {
+		return nil, errors.New("targetType is empty")
+	}
+	valueList := strings.Split(n.value, ",")
+
+	result := make([]interface{}, len(valueList))
+	for i, element := range valueList {
+		parseNode, err := NewFormParseNode([]byte(element))
+		if err != nil {
+			return nil, err
+		}
+
+		val, err := parseNode.getPrimitiveValue(targetType)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = val
+	}
+	return result, nil
+}
+
+func (n *FormParseNode) getPrimitiveValue(targetType string) (interface{}, error) {
+	switch targetType {
+	case "string":
+		return n.GetStringValue()
+	case "bool":
+		return n.GetBoolValue()
+	case "uint8":
+		return n.GetInt8Value()
+	case "byte":
+		return n.GetByteValue()
+	case "float32":
+		return n.GetFloat32Value()
+	case "float64":
+		return n.GetFloat64Value()
+	case "int32":
+		return n.GetInt32Value()
+	case "int64":
+		return n.GetInt64Value()
+	case "time":
+		return n.GetTimeValue()
+	case "timeonly":
+		return n.GetTimeOnlyValue()
+	case "dateonly":
+		return n.GetDateOnlyValue()
+	case "isoduration":
+		return n.GetISODurationValue()
+	case "uuid":
+		return n.GetUUIDValue()
+	case "base64":
+		return n.GetByteArrayValue()
+	default:
+		return nil, errors.New("targetType is not supported")
+	}
 }
 
 // GetCollectionOfEnumValues returns the collection of Enum values from the node.

@@ -271,72 +271,92 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 
 // WriteCollectionOfObjectValues writes a collection of Parsable values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfObjectValues(key string, collection []absser.Parsable) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	if collection != nil && len(collection) > 0 {
+		for _, item := range collection {
+			err := w.WriteObjectValue(key, item)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func writeCollectionOfPrimitiveValues[T interface{}](key string, writer func(string, *T) error, collection []T) error {
+	if collection != nil && len(collection) > 0 {
+		for _, item := range collection {
+			err := writer(key, &item)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // WriteCollectionOfStringValues writes a collection of String values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfStringValues(key string, collection []string) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteStringValue, collection)
 }
 
 // WriteCollectionOfInt32Values writes a collection of Int32 values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfInt32Values(key string, collection []int32) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteInt32Value, collection)
 }
 
 // WriteCollectionOfInt64Values writes a collection of Int64 values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfInt64Values(key string, collection []int64) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteInt64Value, collection)
 }
 
 // WriteCollectionOfFloat32Values writes a collection of Float32 values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfFloat32Values(key string, collection []float32) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteFloat32Value, collection)
 }
 
 // WriteCollectionOfFloat64Values writes a collection of Float64 values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfFloat64Values(key string, collection []float64) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteFloat64Value, collection)
 }
 
 // WriteCollectionOfTimeValues writes a collection of Time values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfTimeValues(key string, collection []time.Time) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteTimeValue, collection)
 }
 
 // WriteCollectionOfISODurationValues writes a collection of ISODuration values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfISODurationValues(key string, collection []absser.ISODuration) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteISODurationValue, collection)
 }
 
 // WriteCollectionOfTimeOnlyValues writes a collection of TimeOnly values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfTimeOnlyValues(key string, collection []absser.TimeOnly) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteTimeOnlyValue, collection)
 }
 
 // WriteCollectionOfDateOnlyValues writes a collection of DateOnly values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfDateOnlyValues(key string, collection []absser.DateOnly) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteDateOnlyValue, collection)
 }
 
 // WriteCollectionOfUUIDValues writes a collection of UUID values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfUUIDValues(key string, collection []uuid.UUID) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteUUIDValue, collection)
 }
 
 // WriteCollectionOfBoolValues writes a collection of Bool values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfBoolValues(key string, collection []bool) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteBoolValue, collection)
 }
 
 // WriteCollectionOfByteValues writes a collection of Byte values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfByteValues(key string, collection []byte) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteByteValue, collection)
 }
 
 // WriteCollectionOfInt8Values writes a collection of int8 values to underlying the byte array.
 func (w *FormSerializationWriter) WriteCollectionOfInt8Values(key string, collection []int8) error {
-	return errors.New("collections serialization is not supported with FormSerializationWriter")
+	return writeCollectionOfPrimitiveValues(key, w.WriteInt8Value, collection)
 }
 
 // GetSerializedContent returns the resulting byte array from the serialization writer.

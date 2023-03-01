@@ -163,6 +163,31 @@ func TestWriteMultipleTypes(t *testing.T) {
 	assert.Equal(t, len("key=value&add1=string&add2=pointer&key2=value2"), len(string(result[:])))
 }
 
+func TestWriteMultipleCollections(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+	value := "value"
+	serializer.WriteStringValue("key", &value)
+
+	adlData := map[string]interface{}{
+		"addStrings": []string{"str1", "str2"},
+		"addInt32":   []int32{34, 56},
+		"addInt64":   []int64{1, 2},
+	}
+	serializer.WriteAdditionalData(adlData)
+
+	result, err := serializer.GetSerializedContent()
+
+	assert.Nil(t, err)
+	resultVal := string(result[:])
+	assert.Contains(t, resultVal, "key=value&")
+	assert.Contains(t, resultVal, "addStrings=str1&")
+	assert.Contains(t, resultVal, "addStrings=str2")
+	assert.Contains(t, resultVal, "addInt32=34")
+	assert.Contains(t, resultVal, "addInt32=56")
+	assert.Contains(t, resultVal, "addInt64=1")
+	assert.Contains(t, resultVal, "addInt64=2")
+}
+
 func TestEscapesNewLinesInStrings(t *testing.T) {
 	serializer := NewFormSerializationWriter()
 	value := "value\nwith\nnew\nlines"
