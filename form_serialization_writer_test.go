@@ -2,6 +2,7 @@ package formserialization
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/microsoft/kiota-serialization-form-go/internal"
 	"testing"
 	"time"
@@ -169,13 +170,20 @@ func TestWriteMultipleCollections(t *testing.T) {
 	serializer.WriteStringValue("key", &value)
 
 	adlData := map[string]interface{}{
-		"string":  []string{"str1", "str2"},
-		"int32":   []int32{34, 56},
-		"bool":    []bool{true, false},
-		"uint8":   []uint8{1, 2},
-		"float32": []float32{32.0, 34.1},
-		"float64": []float64{100.1, 400.1},
-		"int64":   []int64{567, 765},
+		"string":      []string{"str1", "str2"},
+		"int32":       []int32{34, 56},
+		"bool":        []bool{true, false},
+		"uint8":       []uint8{1, 2},
+		"float32":     []float32{32.0, 34.1},
+		"float64":     []float64{100.1, 400.1},
+		"int64":       []int64{567, 765},
+		"time":        []time.Time{time.Now()},
+		"timeonly":    []*absser.ISODuration{absser.NewDuration(0, 0, 1, 0, 0, 0, 0)},
+		"dateonly":    []*absser.DateOnly{absser.NewDateOnly(time.Now())},
+		"isoduration": []*absser.ISODuration{absser.NewDuration(0, 0, 1, 0, 0, 0, 0)},
+		"uuid":        []uuid.UUID{uuid.New()},
+		"base64":      []int64{567, 765},
+		"int8":        []int8{2, 3},
 	}
 	serializer.WriteAdditionalData(adlData)
 

@@ -1,9 +1,8 @@
 package formserialization
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/microsoft/kiota-serialization-form-go/internal"
 
@@ -56,6 +55,10 @@ func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "uint8"),
 	)
 	assert.Equal(t,
+		[]interface{}{ref(byte(1)), ref(byte(2)), ref(byte(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "byte"),
+	)
+	assert.Equal(t,
 		[]interface{}{ref(float32(1)), ref(float32(2)), ref(float32(3))},
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "float32"),
 	)
@@ -74,6 +77,24 @@ func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
 	assert.Equal(t,
 		[]interface{}{ref(int64(1)), ref(int64(2)), ref(int64(3))},
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int64"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "time"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "timeonly"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "dateonly"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "isoduration"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "uuid"),
+	)
+	assert.Nil(t,
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "base64"),
 	)
 }
 
