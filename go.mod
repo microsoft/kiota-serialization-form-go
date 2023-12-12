@@ -3,7 +3,7 @@ module github.com/microsoft/kiota-serialization-form-go
 go 1.19
 
 require (
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.5.0
 	github.com/microsoft/kiota-abstractions-go v1.5.3
 	github.com/stretchr/testify v1.8.4
 )
