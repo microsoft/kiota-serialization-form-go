@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.0.0...v1.1.0) (2025-03-13)
+
+
+### Features
+
+* upgrades required go version from go1.18 to go 1.22 ([d92bfde](https://github.com/microsoft/kiota-serialization-form-go/commit/d92bfdea60153a0cc1f7e38b23db33a313a6fd46))
+
 ## [1.0.0] - 2023-05-04
 
 ### Changed
