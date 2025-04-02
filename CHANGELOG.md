@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.1...v1.1.2) (2025-04-02)
+
+
+### Bug Fixes
+
+* removes common go dependency ([ce7bc35](https://github.com/microsoft/kiota-serialization-form-go/commit/ce7bc35ef5af4073244de8bdab87332dd4897864))
+* removes common go dependency ([1265450](https://github.com/microsoft/kiota-serialization-form-go/commit/1265450a46777d7fd22500f782e587f9eae85217))
+
 ## [1.1.1](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.0...v1.1.1) (2025-03-24)
 
 
