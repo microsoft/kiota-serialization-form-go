@@ -69,7 +69,7 @@ func TestWriteTimeOnlyValue(t *testing.T) {
 	serializer.WriteTimeOnlyValue("key", value)
 	result, err := serializer.GetSerializedContent()
 	assert.Nil(t, err)
-	assert.Equal(t, "key=15%3A04%3A05.000000000", string(result[:]))
+	assert.Equal(t, "key=15%3A04%3A05", string(result[:]))
 }
 
 func TestWriteDateOnlyValue(t *testing.T) {
