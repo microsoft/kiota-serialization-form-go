@@ -159,12 +159,8 @@ func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]int
 
 	result := make([]interface{}, len(valueList))
 	for i, element := range valueList {
-		parseNode, err := NewFormParseNode([]byte(element))
-		if err != nil {
-			return nil, err
-		}
-
-		val, err := parseNode.getPrimitiveValue(targetType)
+		node := &FormParseNode{value: element}
+		val, err := node.getPrimitiveValue(targetType)
 		if err != nil {
 			return nil, err
 		}
