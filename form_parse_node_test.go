@@ -1,6 +1,7 @@
 package formserialization
 
 import (
+	"errors"
 	"github.com/stretchr/testify/require"
 	"testing"
 
@@ -9,6 +10,29 @@ import (
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
 	"github.com/stretchr/testify/assert"
 )
+
+// testColor is a simple enum type used in tests.
+type testColor int
+
+const (
+	testColorRed testColor = iota
+	testColorBlue
+	testColorGreen
+)
+
+// testColorFactory parses "red", "blue", "green" into testColor values.
+func testColorFactory(value string) (interface{}, error) {
+	switch value {
+	case "red":
+		return testColorRed, nil
+	case "blue":
+		return testColorBlue, nil
+	case "green":
+		return testColorGreen, nil
+	default:
+		return nil, errors.New("unknown color: " + value)
+	}
+}
 
 func TestGetRawValue(t *testing.T) {
 	source := `id=2&status=200&item`
@@ -147,3 +171,115 @@ const FunctionalTestSource = "displayName=Megan+Bowen&" +
 	"userPrincipalName=MeganB@M365x214355.onmicrosoft.com&" +
 	"birthDay=2017-09-04&" +
 	"id=48d31887-5fad-4d73-a9f5-3c356e68a038"
+
+func TestGetEnumValue(t *testing.T) {
+	t.Run("returns error when parser is nil", func(t *testing.T) {
+		source := `color=red`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("color")
+		require.NoError(t, err)
+
+		val, err := node.GetEnumValue(nil)
+		assert.Error(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns enum value for valid string", func(t *testing.T) {
+		source := `color=red`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("color")
+		require.NoError(t, err)
+
+		val, err := node.GetEnumValue(testColorFactory)
+		require.NoError(t, err)
+		assert.Equal(t, testColorRed, val)
+	})
+
+	t.Run("returns nil when node value is empty", func(t *testing.T) {
+		node := &FormParseNode{value: ""}
+
+		val, err := node.GetEnumValue(testColorFactory)
+		require.NoError(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns error when factory cannot parse value", func(t *testing.T) {
+		source := `color=unknown`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("color")
+		require.NoError(t, err)
+
+		val, err := node.GetEnumValue(testColorFactory)
+		assert.Error(t, err)
+		assert.Nil(t, val)
+	})
+}
+
+func TestGetCollectionOfEnumValues(t *testing.T) {
+	t.Run("returns nil for nil node", func(t *testing.T) {
+		var node *FormParseNode
+
+		val, err := node.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns nil for empty value", func(t *testing.T) {
+		node := &FormParseNode{value: ""}
+
+		val, err := node.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns error when parser is nil", func(t *testing.T) {
+		source := `colors=red,blue`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("colors")
+		require.NoError(t, err)
+
+		val, err := node.GetCollectionOfEnumValues(nil)
+		assert.Error(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns single-element slice for one value", func(t *testing.T) {
+		source := `colors=green`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("colors")
+		require.NoError(t, err)
+
+		val, err := node.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{testColorGreen}, val)
+	})
+
+	t.Run("returns all enum values from comma-separated string", func(t *testing.T) {
+		source := `colors=red,blue,green`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("colors")
+		require.NoError(t, err)
+
+		val, err := node.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{testColorRed, testColorBlue, testColorGreen}, val)
+	})
+
+	t.Run("returns error when one value in collection is invalid", func(t *testing.T) {
+		source := `colors=red,unknown,green`
+		parseNode, err := NewFormParseNode([]byte(source))
+		require.NoError(t, err)
+		node, err := parseNode.GetChildNode("colors")
+		require.NoError(t, err)
+
+		val, err := node.GetCollectionOfEnumValues(testColorFactory)
+		assert.Error(t, err)
+		assert.Nil(t, val)
+	})
+}
