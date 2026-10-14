@@ -417,3 +417,87 @@ func TestInt8ValueRetainsSignedRange(t *testing.T) {
 		assert.Equal(t, value, *actual)
 	}
 }
+
+func TestAdditionalDataStringsRoundTrip(t *testing.T) {
+	for _, value := range []string{"a&b", "hello world", "a+b", "%2F", "café", "one,two", "plain"} {
+		t.Run(value, func(t *testing.T) {
+			entity := internal.NewTestEntity()
+			entity.SetOfficeLocation(&value)
+			entity.SetAdditionalData(map[string]interface{}{"custom": value})
+			writer := NewFormSerializationWriter()
+			require.NoError(t, writer.WriteObjectValue("", entity))
+			require.NoError(t, writer.WriteAdditionalData(entity.GetAdditionalData()))
+			content, err := writer.GetSerializedContent()
+			require.NoError(t, err)
+			node, err := NewFormParseNodeFactory().GetRootParseNode("application/x-www-form-urlencoded", content)
+			require.NoError(t, err)
+			result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+			require.NoError(t, err)
+			actual := result.(internal.TestEntityable)
+			require.NotNil(t, actual.GetOfficeLocation())
+			assert.Equal(t, value, *actual.GetOfficeLocation())
+			assert.Equal(t, value, actual.GetAdditionalData()["custom"])
+		})
+	}
+}
+
+func TestFieldValuesPreserveEqualsSigns(t *testing.T) {
+	for _, value := range []string{"a=b", "a=b=c", "=leading", "trailing=", "="} {
+		t.Run(value, func(t *testing.T) {
+			node, err := NewFormParseNode([]byte("officeLocation=" + value + "&custom=" + value + "&other=plain"))
+			require.NoError(t, err)
+			result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+			require.NoError(t, err)
+			actual := result.(internal.TestEntityable)
+			require.NotNil(t, actual.GetOfficeLocation())
+			assert.Equal(t, value, *actual.GetOfficeLocation())
+			assert.Equal(t, value, actual.GetAdditionalData()["custom"])
+			assert.Equal(t, "plain", actual.GetAdditionalData()["other"])
+		})
+	}
+}
+
+func TestEncodedEqualsSignsDecodeOnce(t *testing.T) {
+	node, err := NewFormParseNode([]byte("officeLocation=a%3Db&custom=a%3Db&literal=%253D"))
+	require.NoError(t, err)
+	result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	actual := result.(internal.TestEntityable)
+	require.NotNil(t, actual.GetOfficeLocation())
+	assert.Equal(t, "a=b", *actual.GetOfficeLocation())
+	assert.Equal(t, "a=b", actual.GetAdditionalData()["custom"])
+	assert.Equal(t, "%3D", actual.GetAdditionalData()["literal"])
+}
+
+func TestAdditionalDataRepeatedValuesDecodeOnce(t *testing.T) {
+	node, err := NewFormParseNode([]byte("custom%2Bfield=one%2Btwo&custom%2Bfield=three%2Cfour&custom%2Bfield=%252F"))
+	require.NoError(t, err)
+	result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Equal(t, "one+two,three,four,%2F", result.(internal.TestEntityable).GetAdditionalData()["custom+field"])
+}
+
+func TestAdditionalDataRejectsInvalidEscapes(t *testing.T) {
+	for _, value := range []string{"%", "%ZZ"} {
+		t.Run(value, func(t *testing.T) {
+			node, err := NewFormParseNode([]byte("custom=" + value))
+			require.NoError(t, err)
+			result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
+	}
+}
+
+func TestFieldParsingPreservesCollectionAndEmptyValueBehavior(t *testing.T) {
+	node, err := NewFormParseNode([]byte("items=a%2Cb&items=%252F&items=one%2Btwo&custom=&other=plain"))
+	require.NoError(t, err)
+	child, err := node.GetChildNode("items")
+	require.NoError(t, err)
+	values, err := child.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{ref("a,b"), ref("%2F"), ref("one+two")}, values)
+	result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.NotContains(t, result.(internal.TestEntityable).GetAdditionalData(), "custom")
+}
