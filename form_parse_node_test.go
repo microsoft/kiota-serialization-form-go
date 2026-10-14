@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/microsoft/kiota-serialization-form-go/internal"
@@ -318,6 +319,27 @@ func TestInt64ValuesRoundTripWithoutPrecisionLoss(t *testing.T) {
 	require.Len(t, actual, len(values))
 	for i, value := range values {
 		assert.Equal(t, value, *actual[i].(*int64))
+	}
+}
+
+func TestInt64ValuesRejectOutOfRangeIntegers(t *testing.T) {
+	for _, value := range []string{"9223372036854775808", "-9223372036854775809", "18446744073709551616"} {
+		t.Run(value, func(t *testing.T) {
+			t.Run("scalar", func(t *testing.T) {
+				node, err := NewFormParseNode([]byte(value))
+				require.NoError(t, err)
+				actual, err := node.GetInt64Value()
+				require.ErrorIs(t, err, strconv.ErrRange)
+				assert.Nil(t, actual)
+			})
+			t.Run("collection", func(t *testing.T) {
+				node, err := NewFormParseNode([]byte("42," + value))
+				require.NoError(t, err)
+				values, err := node.GetCollectionOfPrimitiveValues("int64")
+				require.ErrorIs(t, err, strconv.ErrRange)
+				assert.Nil(t, values)
+			})
+		})
 	}
 }
 
