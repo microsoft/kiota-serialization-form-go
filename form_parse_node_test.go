@@ -2,7 +2,9 @@ package formserialization
 
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/require"
+	"math"
 	"testing"
 
 	"github.com/microsoft/kiota-serialization-form-go/internal"
@@ -282,4 +284,114 @@ func TestGetCollectionOfEnumValues(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, val)
 	})
+}
+
+func TestInt64ValuesRoundTripWithoutPrecisionLoss(t *testing.T) {
+	values := []int64{0, 42, 9007199254740991, 9007199254740993, -9007199254740993, math.MaxInt64, math.MinInt64}
+	for _, value := range values {
+		t.Run(fmt.Sprint(value), func(t *testing.T) {
+			writer := NewFormSerializationWriter()
+			require.NoError(t, writer.WriteInt64Value("id", &value))
+			content, err := writer.GetSerializedContent()
+			require.NoError(t, err)
+			root, err := NewFormParseNodeFactory().GetRootParseNode("application/x-www-form-urlencoded", content)
+			require.NoError(t, err)
+			node, err := root.GetChildNode("id")
+			require.NoError(t, err)
+			require.NotNil(t, node)
+			actual, err := node.GetInt64Value()
+			require.NoError(t, err)
+			require.NotNil(t, actual)
+			assert.Equal(t, value, *actual)
+		})
+	}
+	writer := NewFormSerializationWriter()
+	require.NoError(t, writer.WriteCollectionOfInt64Values("ids", values))
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	root, err := NewFormParseNode(content)
+	require.NoError(t, err)
+	node, err := root.GetChildNode("ids")
+	require.NoError(t, err)
+	actual, err := node.GetCollectionOfPrimitiveValues("int64")
+	require.NoError(t, err)
+	require.Len(t, actual, len(values))
+	for i, value := range values {
+		assert.Equal(t, value, *actual[i].(*int64))
+	}
+}
+
+func TestInt64ValuePreservesNumericCoercion(t *testing.T) {
+	for value, expected := range map[string]int64{"1.5": 1, "-1.5": -1, "1e3": 1000} {
+		t.Run(value, func(t *testing.T) {
+			node, err := NewFormParseNode([]byte(value))
+			require.NoError(t, err)
+			actual, err := node.GetInt64Value()
+			require.NoError(t, err)
+			require.NotNil(t, actual)
+			assert.Equal(t, expected, *actual)
+		})
+	}
+}
+
+func TestByteValuesRoundTripAcrossUnsignedRange(t *testing.T) {
+	values := []byte{0, 97, 127, 128, 255}
+	for _, value := range values {
+		t.Run(fmt.Sprint(value), func(t *testing.T) {
+			writer := NewFormSerializationWriter()
+			require.NoError(t, writer.WriteByteValue("value", &value))
+			content, err := writer.GetSerializedContent()
+			require.NoError(t, err)
+			root, err := NewFormParseNode(content)
+			require.NoError(t, err)
+			node, err := root.GetChildNode("value")
+			require.NoError(t, err)
+			actual, err := node.GetByteValue()
+			require.NoError(t, err)
+			require.NotNil(t, actual)
+			assert.Equal(t, value, *actual)
+		})
+	}
+	writer := NewFormSerializationWriter()
+	require.NoError(t, writer.WriteCollectionOfByteValues("values", values))
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	root, err := NewFormParseNode(content)
+	require.NoError(t, err)
+	node, err := root.GetChildNode("values")
+	require.NoError(t, err)
+	actual, err := node.GetCollectionOfPrimitiveValues("byte")
+	require.NoError(t, err)
+	require.Len(t, actual, len(values))
+	for i, value := range values {
+		assert.Equal(t, value, *actual[i].(*byte))
+	}
+}
+
+func TestByteValueRejectsInvalidValues(t *testing.T) {
+	for _, value := range []string{"-1", "-128", "256", "invalid"} {
+		t.Run(value, func(t *testing.T) {
+			root, err := NewFormParseNode([]byte("value=" + value))
+			require.NoError(t, err)
+			node, err := root.GetChildNode("value")
+			require.NoError(t, err)
+			actual, err := node.GetByteValue()
+			assert.Error(t, err)
+			assert.Nil(t, actual)
+			collection, err := node.GetCollectionOfPrimitiveValues("byte")
+			assert.Error(t, err)
+			assert.Nil(t, collection)
+		})
+	}
+}
+
+func TestInt8ValueRetainsSignedRange(t *testing.T) {
+	for _, value := range []int8{-128, -1, 0, 127} {
+		node, err := NewFormParseNode([]byte(fmt.Sprint(value)))
+		require.NoError(t, err)
+		actual, err := node.GetInt8Value()
+		require.NoError(t, err)
+		require.NotNil(t, actual)
+		assert.Equal(t, value, *actual)
+	}
 }
