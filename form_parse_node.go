@@ -285,7 +285,7 @@ func (n *FormParseNode) GetByteValue() (*byte, error) {
 }
 
 func getByteValue(value string) (*byte, error) {
-	res, err := strconv.ParseInt(value, 10, 8)
+	res, err := strconv.ParseUint(value, 10, 8)
 	if err != nil {
 		return nil, err
 	}
@@ -358,6 +358,12 @@ func (n *FormParseNode) GetInt64Value() (*int64, error) {
 }
 
 func getInt64Value(value string) (*int64, error) {
+	// Parse integer tokens directly before the floating-point coercion can lose precision.
+	if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return &parsed, nil
+	} else if !errors.Is(err, strconv.ErrSyntax) {
+		return nil, err
+	}
 	v, err := getFloat64Value(value)
 	if err != nil {
 		return nil, err
