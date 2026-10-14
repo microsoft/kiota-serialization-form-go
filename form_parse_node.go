@@ -44,7 +44,7 @@ func loadFields(value string) (map[string]string, error) {
 	}
 	parts := strings.Split(value, "&")
 	for _, part := range parts {
-		keyValue := strings.Split(part, "=")
+		keyValue := strings.SplitN(part, "=", 2)
 		if len(keyValue) == 2 {
 			key, err := sanitizeKey(keyValue[0])
 			if err != nil {
@@ -121,10 +121,11 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 			field := fields[key]
 			if field == nil {
 				if value != "" && isHolder {
+					decodedValue, err := url.QueryUnescape(value)
 					if err != nil {
 						return nil, err
 					}
-					itemAdditionalData[key] = value
+					itemAdditionalData[key] = decodedValue
 				}
 			} else {
 				childNode, err := n.GetChildNode(key)
