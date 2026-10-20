@@ -106,6 +106,10 @@ func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int32"),
 	)
 	assert.Equal(t,
+		[]interface{}{ref(int32(42)), ref(int32(-42))},
+		getCollectionValues("id=2&status=200&item=42000000000e-9&item=-42000000000e-9", "item", "int32"),
+	)
+	assert.Equal(t,
 		[]interface{}{ref(int64(1)), ref(int64(2)), ref(int64(3))},
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int64"),
 	)
@@ -348,7 +352,7 @@ func TestInt64ValuesRejectOutOfRangeIntegers(t *testing.T) {
 }
 
 func TestInt64ValuePreservesNumericCoercion(t *testing.T) {
-	for value, expected := range map[string]int64{"1.5": 1, "-1.5": -1, "1e3": 1000} {
+	for value, expected := range map[string]int64{"1.5": 1, "-1.5": -1, "1e3": 1000, "420000000000000000000e-10": 42000000000, "-420000000000000000000e-10": -42000000000} {
 		t.Run(value, func(t *testing.T) {
 			node, err := NewFormParseNode([]byte(value))
 			require.NoError(t, err)
@@ -545,6 +549,26 @@ func TestGetInt32Value(t *testing.T) {
 		val, err := child.GetInt32Value()
 		require.NoError(t, err)
 		assert.Equal(t, int32(42), *val)
+	})
+
+	t.Run("parses scientific notation with large mantissa", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=42000000000e-9"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		require.NoError(t, err)
+		assert.Equal(t, int32(42), *val)
+	})
+
+	t.Run("parses negative scientific notation with large mantissa", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=-42000000000e-9"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		require.NoError(t, err)
+		assert.Equal(t, int32(-42), *val)
 	})
 }
 

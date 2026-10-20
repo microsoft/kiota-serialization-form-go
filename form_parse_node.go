@@ -342,7 +342,7 @@ func getInt32Value(value string) (*int32, error) {
 	if parsed, err := strconv.ParseInt(value, 10, 32); err == nil {
 		cast := int32(parsed)
 		return &cast, nil
-	} else if !errors.Is(err, strconv.ErrSyntax) {
+	} else if !errors.Is(err, strconv.ErrSyntax) && !strings.ContainsAny(value, ".eE") {
 		return nil, err
 	}
 	v, err := getFloat64Value(value)
@@ -368,7 +368,7 @@ func getInt64Value(value string) (*int64, error) {
 	// Parse integer tokens directly before the floating-point coercion can lose precision.
 	if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 		return &parsed, nil
-	} else if !errors.Is(err, strconv.ErrSyntax) {
+	} else if !errors.Is(err, strconv.ErrSyntax) && !strings.ContainsAny(value, ".eE") {
 		return nil, err
 	}
 	v, err := getFloat64Value(value)
