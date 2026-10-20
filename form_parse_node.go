@@ -14,7 +14,7 @@ import (
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
-// FormParseNode is a ParseNode implementation for JSON.
+// FormParseNode is a ParseNode implementation for URI form encoded.
 type FormParseNode struct {
 	value                     string
 	fields                    map[string]string
@@ -175,7 +175,7 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 		return getStringValue(value)
 	case "bool":
 		return getBoolValue(value)
-	case "uint8":
+	case "int8", "uint8":
 		return getInt8Value(value)
 	case "byte":
 		return getByteValue(value)
@@ -338,6 +338,13 @@ func (n *FormParseNode) GetInt32Value() (*int32, error) {
 }
 
 func getInt32Value(value string) (*int32, error) {
+	// Parse integer tokens directly before the floating-point coercion can lose precision.
+	if parsed, err := strconv.ParseInt(value, 10, 32); err == nil {
+		cast := int32(parsed)
+		return &cast, nil
+	} else if !errors.Is(err, strconv.ErrSyntax) {
+		return nil, err
+	}
 	v, err := getFloat64Value(value)
 	if err != nil {
 		return nil, err
