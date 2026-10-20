@@ -331,7 +331,15 @@ func TestInt64ValuesRoundTripWithoutPrecisionLoss(t *testing.T) {
 }
 
 func TestInt64ValuesRejectOutOfRangeIntegers(t *testing.T) {
-	for _, value := range []string{"9223372036854775808", "-9223372036854775809", "18446744073709551616"} {
+	for _, value := range []string{
+		"9223372036854775808",
+		"-9223372036854775809",
+		"18446744073709551616",
+		"420000000000000000000e-1",
+		"-420000000000000000000e-1",
+		"1e20",
+		"-1e20",
+	} {
 		t.Run(value, func(t *testing.T) {
 			t.Run("scalar", func(t *testing.T) {
 				node, err := NewFormParseNode([]byte(value))
@@ -344,6 +352,34 @@ func TestInt64ValuesRejectOutOfRangeIntegers(t *testing.T) {
 				node, err := NewFormParseNode([]byte("42," + value))
 				require.NoError(t, err)
 				values, err := node.GetCollectionOfPrimitiveValues("int64")
+				require.ErrorIs(t, err, strconv.ErrRange)
+				assert.Nil(t, values)
+			})
+		})
+	}
+}
+
+func TestInt32ValuesRejectOutOfRangeIntegers(t *testing.T) {
+	for _, value := range []string{
+		"2147483648",
+		"-2147483649",
+		"42000000000e-1",
+		"-42000000000e-1",
+		"1e11",
+		"-1e11",
+	} {
+		t.Run(value, func(t *testing.T) {
+			t.Run("scalar", func(t *testing.T) {
+				node, err := NewFormParseNode([]byte(value))
+				require.NoError(t, err)
+				actual, err := node.GetInt32Value()
+				require.ErrorIs(t, err, strconv.ErrRange)
+				assert.Nil(t, actual)
+			})
+			t.Run("collection", func(t *testing.T) {
+				node, err := NewFormParseNode([]byte("42," + value))
+				require.NoError(t, err)
+				values, err := node.GetCollectionOfPrimitiveValues("int32")
 				require.ErrorIs(t, err, strconv.ErrRange)
 				assert.Nil(t, values)
 			})

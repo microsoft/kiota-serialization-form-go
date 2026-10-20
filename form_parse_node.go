@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -338,21 +339,26 @@ func (n *FormParseNode) GetInt32Value() (*int32, error) {
 }
 
 func getInt32Value(value string) (*int32, error) {
-	// Parse integer tokens directly before the floating-point coercion can lose precision.
-	if parsed, err := strconv.ParseInt(value, 10, 32); err == nil {
-		cast := int32(parsed)
+	if strings.ContainsAny(value, ".eE") {
+		v, err := getFloat64Value(value)
+		if err != nil {
+			return nil, err
+		}
+		if v == nil {
+			return nil, nil
+		}
+		if math.IsNaN(*v) || *v > math.MaxInt32 || *v < math.MinInt32 {
+			return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+		}
+		cast := int32(*v)
 		return &cast, nil
-	} else if !errors.Is(err, strconv.ErrSyntax) && !strings.ContainsAny(value, ".eE") {
-		return nil, err
 	}
-	v, err := getFloat64Value(value)
+	// Parse integer tokens directly before floating-point coercion can lose precision or accept non-integers.
+	parsed, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	cast := int32(*v)
+	cast := int32(parsed)
 	return &cast, nil
 }
 
@@ -365,21 +371,26 @@ func (n *FormParseNode) GetInt64Value() (*int64, error) {
 }
 
 func getInt64Value(value string) (*int64, error) {
-	// Parse integer tokens directly before the floating-point coercion can lose precision.
-	if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-		return &parsed, nil
-	} else if !errors.Is(err, strconv.ErrSyntax) && !strings.ContainsAny(value, ".eE") {
-		return nil, err
+	if strings.ContainsAny(value, ".eE") {
+		v, err := getFloat64Value(value)
+		if err != nil {
+			return nil, err
+		}
+		if v == nil {
+			return nil, nil
+		}
+		if math.IsNaN(*v) || *v >= math.MaxInt64 || *v < math.MinInt64 {
+			return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+		}
+		cast := int64(*v)
+		return &cast, nil
 	}
-	v, err := getFloat64Value(value)
+	// Parse integer tokens directly before floating-point coercion can lose precision or accept non-integers.
+	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	cast := int64(*v)
-	return &cast, nil
+	return &parsed, nil
 }
 
 // GetTimeValue returns a Time value from the nodes.
