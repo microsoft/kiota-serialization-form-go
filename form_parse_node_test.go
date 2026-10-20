@@ -98,6 +98,10 @@ func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "float64"),
 	)
 	assert.Equal(t,
+		[]interface{}{ref(int8(1)), ref(int8(2)), ref(int8(3))},
+		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int8"),
+	)
+	assert.Equal(t,
 		[]interface{}{ref(int32(1)), ref(int32(2)), ref(int32(3))},
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int32"),
 	)
@@ -501,3 +505,46 @@ func TestFieldParsingPreservesCollectionAndEmptyValueBehavior(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, result.(internal.TestEntityable).GetAdditionalData(), "custom")
 }
+
+func TestGetInt32Value(t *testing.T) {
+	t.Run("parses valid int32", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=2147483647"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		require.NoError(t, err)
+		assert.Equal(t, int32(2147483647), *val)
+	})
+
+	t.Run("parses negative int32", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=-2147483648"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		require.NoError(t, err)
+		assert.Equal(t, int32(-2147483648), *val)
+	})
+
+	t.Run("rejects overflow int32", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=2147483648"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		assert.Error(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("coerces floating point integer format", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("value=42.0"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("value")
+		require.NoError(t, err)
+		val, err := child.GetInt32Value()
+		require.NoError(t, err)
+		assert.Equal(t, int32(42), *val)
+	})
+}
+
