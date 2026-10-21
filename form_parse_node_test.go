@@ -113,6 +113,10 @@ func TestGetCollectionOfPrimitiveValuesTypes(t *testing.T) {
 		[]interface{}{ref(int64(1)), ref(int64(2)), ref(int64(3))},
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "int64"),
 	)
+	assert.Equal(t,
+		[]interface{}{ref(int64(-9223372036854775808)), ref(int64(9223372036854775807))},
+		getCollectionValues("id=2&status=200&item=-9223372036854775808e0&item=9223372036854775807e0", "item", "int64"),
+	)
 	assert.Nil(t,
 		getCollectionValues("id=2&status=200&item=1&item=2&item=3", "item", "time"),
 	)
@@ -335,6 +339,8 @@ func TestInt64ValuesRejectOutOfRangeIntegers(t *testing.T) {
 		"9223372036854775808",
 		"-9223372036854775809",
 		"18446744073709551616",
+		"9223372036854775808e0",
+		"-9223372036854775809e0",
 		"420000000000000000000e-1",
 		"-420000000000000000000e-1",
 		"1e20",
@@ -363,6 +369,8 @@ func TestInt32ValuesRejectOutOfRangeIntegers(t *testing.T) {
 	for _, value := range []string{
 		"2147483648",
 		"-2147483649",
+		"2147483648e0",
+		"-2147483649e0",
 		"42000000000e-1",
 		"-42000000000e-1",
 		"1e11",
@@ -388,7 +396,15 @@ func TestInt32ValuesRejectOutOfRangeIntegers(t *testing.T) {
 }
 
 func TestInt64ValuePreservesNumericCoercion(t *testing.T) {
-	for value, expected := range map[string]int64{"1.5": 1, "-1.5": -1, "1e3": 1000, "420000000000000000000e-10": 42000000000, "-420000000000000000000e-10": -42000000000} {
+	for value, expected := range map[string]int64{
+		"1.5": 1,
+		"-1.5": -1,
+		"1e3": 1000,
+		"-9223372036854775808e0": -9223372036854775808,
+		"9223372036854775807e0": 9223372036854775807,
+		"420000000000000000000e-10": 42000000000,
+		"-420000000000000000000e-10": -42000000000,
+	} {
 		t.Run(value, func(t *testing.T) {
 			node, err := NewFormParseNode([]byte(value))
 			require.NoError(t, err)

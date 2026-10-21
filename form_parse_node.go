@@ -6,6 +6,7 @@ import (
 	"errors"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"math"
+	"math/big"
 	"net/url"
 	"strconv"
 	"strings"
@@ -338,27 +339,42 @@ func (n *FormParseNode) GetInt32Value() (*int32, error) {
 	return getInt32Value(n.value)
 }
 
-func getInt32Value(value string) (*int32, error) {
+func parseNumberAsInt64(value string) (int64, error) {
 	if strings.ContainsAny(value, ".eE") {
 		v, err := getFloat64Value(value)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		if v == nil {
-			return nil, nil
+			return 0, nil
 		}
-		if math.IsNaN(*v) || *v > math.MaxInt32 || *v < math.MinInt32 {
-			return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+		if math.IsNaN(*v) || math.IsInf(*v, 0) {
+			return 0, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
 		}
-		cast := int32(*v)
-		return &cast, nil
+		r, ok := new(big.Rat).SetString(value)
+		if !ok {
+			return 0, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrSyntax}
+		}
+		var intPart big.Int
+		intPart.Quo(r.Num(), r.Denom())
+		if !intPart.IsInt64() {
+			return 0, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+		}
+		return intPart.Int64(), nil
 	}
 	// Parse integer tokens directly before floating-point coercion can lose precision or accept non-integers.
-	parsed, err := strconv.ParseInt(value, 10, 32)
+	return strconv.ParseInt(value, 10, 64)
+}
+
+func getInt32Value(value string) (*int32, error) {
+	val, err := parseNumberAsInt64(value)
 	if err != nil {
 		return nil, err
 	}
-	cast := int32(parsed)
+	if val > math.MaxInt32 || val < math.MinInt32 {
+		return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+	}
+	cast := int32(val)
 	return &cast, nil
 }
 
@@ -371,26 +387,11 @@ func (n *FormParseNode) GetInt64Value() (*int64, error) {
 }
 
 func getInt64Value(value string) (*int64, error) {
-	if strings.ContainsAny(value, ".eE") {
-		v, err := getFloat64Value(value)
-		if err != nil {
-			return nil, err
-		}
-		if v == nil {
-			return nil, nil
-		}
-		if math.IsNaN(*v) || *v >= math.MaxInt64 || *v < math.MinInt64 {
-			return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
-		}
-		cast := int64(*v)
-		return &cast, nil
-	}
-	// Parse integer tokens directly before floating-point coercion can lose precision or accept non-integers.
-	parsed, err := strconv.ParseInt(value, 10, 64)
+	val, err := parseNumberAsInt64(value)
 	if err != nil {
 		return nil, err
 	}
-	return &parsed, nil
+	return &val, nil
 }
 
 // GetTimeValue returns a Time value from the nodes.
