@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.5](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.4...v1.1.5) (2026-10-21)
+
+
+### Bug Fixes
+
+* **form:** allow scientific notation fallback on ParseInt range errors ([424c789](https://github.com/microsoft/kiota-serialization-form-go/commit/424c789ad544946fd8fa5d6ee401a08dabc4fd07))
+* **form:** improve int32 parsing and support int8 primitive collections ([60c8680](https://github.com/microsoft/kiota-serialization-form-go/commit/60c8680fe3bff66e05ba4c75b1b9f3f8e19d2e55))
+* **form:** improve int32 parsing and support int8 primitive collections ([464ea91](https://github.com/microsoft/kiota-serialization-form-go/commit/464ea91ea0e9461eaeb7679c3fa48297f2315aec))
+* **form:** validate float bounds before integer conversion and sequence float check ([75b6b0b](https://github.com/microsoft/kiota-serialization-form-go/commit/75b6b0b8b3cc99bad6196ecc718b454d05146d60))
+* **form:** validate full precision exponent tokens using big.Rat to prevent float64 rounding overflow ([66eff78](https://github.com/microsoft/kiota-serialization-form-go/commit/66eff78ac8132d50ab2ccf4f28e099cc4c14147c))
+
 ## [1.1.4](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.3...v1.1.4) (2026-10-14)
 
 
