@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.6](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.5...v1.1.6) (2026-10-23)
+
+
+### Bug Fixes
+
+* **form:** support RFC3339Nano time parsing and add nil guards to FormParseNode ([d646004](https://github.com/microsoft/kiota-serialization-form-go/commit/d646004555d3cb3eddce809555f3760a0e90d104))
+* **form:** support RFC3339Nano time parsing and add nil guards to FormParseNode ([3b0b1f8](https://github.com/microsoft/kiota-serialization-form-go/commit/3b0b1f85d53f819590cf8ade437224f0b47b6d95))
+
 ## [1.1.5](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.4...v1.1.5) (2026-10-21)
 
 
