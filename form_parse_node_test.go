@@ -624,3 +624,49 @@ func TestGetInt32Value(t *testing.T) {
 	})
 }
 
+
+func TestGetTimeValueWithSubsecondsAndWhitespace(t *testing.T) {
+	node, err := NewFormParseNode([]byte("t1=2020-12-31T23%3A59%3A59.123456789Z&t2=2020-12-31T23%3A59%3A59.999Z&t3=%202020-12-31T23%3A59%3A59Z%20"))
+	assert.NoError(t, err)
+
+	child1, err := node.GetChildNode("t1")
+	assert.NoError(t, err)
+	t1, err := child1.GetTimeValue()
+	assert.NoError(t, err)
+	assert.NotNil(t, t1)
+	assert.Equal(t, 123456789, t1.Nanosecond())
+
+	child2, err := node.GetChildNode("t2")
+	assert.NoError(t, err)
+	t2, err := child2.GetTimeValue()
+	assert.NoError(t, err)
+	assert.NotNil(t, t2)
+	assert.Equal(t, 999000000, t2.Nanosecond())
+
+	child3, err := node.GetChildNode("t3")
+	assert.NoError(t, err)
+	t3, err := child3.GetTimeValue()
+	assert.NoError(t, err)
+	assert.NotNil(t, t3)
+	assert.Equal(t, 2020, t3.Year())
+}
+
+func TestFormParseNodeNilReceiverGuards(t *testing.T) {
+	var nilNode *FormParseNode
+
+	assert.NotPanics(t, func() {
+		child, err := nilNode.GetChildNode("key")
+		assert.Error(t, err)
+		assert.Nil(t, child)
+
+		objs, err := nilNode.GetCollectionOfObjectValues(nil)
+		assert.NoError(t, err)
+		assert.Nil(t, objs)
+
+		assert.Nil(t, nilNode.GetOnBeforeAssignFieldValues())
+		assert.Error(t, nilNode.SetOnBeforeAssignFieldValues(func(absser.Parsable) error { return nil }))
+
+		assert.Nil(t, nilNode.GetOnAfterAssignFieldValues())
+		assert.Error(t, nilNode.SetOnAfterAssignFieldValues(func(absser.Parsable) error { return nil }))
+	})
+}

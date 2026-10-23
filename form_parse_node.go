@@ -74,6 +74,9 @@ func sanitizeKey(key string) (string, error) {
 
 // GetChildNode returns a new parse node for the given identifier.
 func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
+	if n == nil {
+		return nil, errors.New("node is nil")
+	}
 	if index == "" {
 		return nil, errors.New("index is empty")
 	}
@@ -147,6 +150,9 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 
 // GetCollectionOfObjectValues returns the collection of Parsable values from the node.
 func (n *FormParseNode) GetCollectionOfObjectValues(ctor absser.ParsableFactory) ([]absser.Parsable, error) {
+	if n == nil || n.value == "" {
+		return nil, nil
+	}
 	return nil, errors.New("collections are not supported in form serialization")
 }
 
@@ -410,8 +416,18 @@ func getTimeValue(value string) (*time.Time, error) {
 	if v == nil {
 		return nil, nil
 	}
-	parsed, err := time.Parse(time.RFC3339, *v)
-	return &parsed, err
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		parsed, err = time.Parse(time.RFC3339Nano, trimmed)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &parsed, nil
 }
 
 // GetISODurationValue returns a ISODuration value from the nodes.
@@ -535,19 +551,31 @@ func (n *FormParseNode) GetRawValue() (interface{}, error) {
 }
 
 func (n *FormParseNode) GetOnBeforeAssignFieldValues() absser.ParsableAction {
+	if n == nil {
+		return nil
+	}
 	return n.onBeforeAssignFieldValues
 }
 
 func (n *FormParseNode) SetOnBeforeAssignFieldValues(action absser.ParsableAction) error {
+	if n == nil {
+		return errors.New("node is nil")
+	}
 	n.onBeforeAssignFieldValues = action
 	return nil
 }
 
 func (n *FormParseNode) GetOnAfterAssignFieldValues() absser.ParsableAction {
+	if n == nil {
+		return nil
+	}
 	return n.onAfterAssignFieldValues
 }
 
 func (n *FormParseNode) SetOnAfterAssignFieldValues(action absser.ParsableAction) error {
+	if n == nil {
+		return errors.New("node is nil")
+	}
 	n.onAfterAssignFieldValues = action
 	return nil
 }
