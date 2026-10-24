@@ -353,6 +353,9 @@ func (w *FormSerializationWriter) WriteCollectionOfInt8Values(key string, collec
 
 // GetSerializedContent returns the resulting byte array from the serialization writer.
 func (w *FormSerializationWriter) GetSerializedContent() ([]byte, error) {
+	if w == nil {
+		return nil, errors.New("writer cannot be nil")
+	}
 	w.trimLastPropertySeparator()
 	resultStr := strings.Join(w.writer, "")
 	return []byte(resultStr), nil
@@ -459,6 +462,9 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 
 // Close clears the internal buffer.
 func (w *FormSerializationWriter) Close() error {
+	if w == nil {
+		return nil
+	}
 	w.writer = make([]string, 0)
 	return nil
 }
