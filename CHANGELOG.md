@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.6](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.5...v1.1.6) (2026-10-27)
+
+
+### Bug Fixes
+
+* **form:** add nil receiver safety guards to FormSerializationWriter ([647f7ba](https://github.com/microsoft/kiota-serialization-form-go/commit/647f7bacf062af29b006974fd12e09257cf9485f))
+* **form:** support content-type parameters and case-insensitive matching in parse and writer factories ([681c90c](https://github.com/microsoft/kiota-serialization-form-go/commit/681c90c54daf3e542f10542d942b62ddb3d34644))
+* **form:** support content-type parameters, trim whitespace, and add nil receiver guards ([7126fad](https://github.com/microsoft/kiota-serialization-form-go/commit/7126fada978903e069d93b059a605455be50ce84))
+* **form:** support RFC3339Nano time parsing and add nil guards to FormParseNode ([d646004](https://github.com/microsoft/kiota-serialization-form-go/commit/d646004555d3cb3eddce809555f3760a0e90d104))
+* **form:** support RFC3339Nano time parsing and add nil guards to FormParseNode ([3b0b1f8](https://github.com/microsoft/kiota-serialization-form-go/commit/3b0b1f85d53f819590cf8ade437224f0b47b6d95))
+
 ## [1.1.5](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.4...v1.1.5) (2026-10-21)
 
 
