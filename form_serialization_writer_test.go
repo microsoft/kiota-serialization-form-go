@@ -268,3 +268,15 @@ func TestJsonSerializationWriter(t *testing.T) {
 	assert.Equal(t, 1, countAfter)
 	assert.Equal(t, 1, countStart)
 }
+
+func TestFormSerializationWriterNilGuards(t *testing.T) {
+	var nilWriter *FormSerializationWriter
+	assert.NotPanics(t, func() {
+		content, err := nilWriter.GetSerializedContent()
+		assert.Error(t, err)
+		assert.Nil(t, content)
+
+		err = nilWriter.Close()
+		assert.NoError(t, err)
+	})
+}
