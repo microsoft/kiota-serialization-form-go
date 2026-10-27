@@ -2,6 +2,7 @@ package formserialization
 
 import (
 	"errors"
+	"strings"
 
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
 )
@@ -22,14 +23,22 @@ func (f *FormSerializationWriterFactory) GetValidContentType() (string, error) {
 
 // GetSerializationWriter returns the relevant SerializationWriter instance for the given content type
 func (f *FormSerializationWriterFactory) GetSerializationWriter(contentType string) (absser.SerializationWriter, error) {
+	if f == nil {
+		return nil, errors.New("factory cannot be nil")
+	}
 	validType, err := f.GetValidContentType()
 	if err != nil {
 		return nil, err
-	} else if contentType == "" {
-		return nil, errors.New("contentType is empty")
-	} else if contentType != validType {
-		return nil, errors.New("contentType is not valid")
-	} else {
-		return NewFormSerializationWriter(), nil
 	}
+	trimmed := strings.TrimSpace(contentType)
+	if trimmed == "" {
+		return nil, errors.New("contentType is empty")
+	}
+
+	mediaType, _, _ := strings.Cut(trimmed, ";")
+	if strings.ToLower(strings.TrimSpace(mediaType)) != validType {
+		return nil, errors.New("contentType is not valid")
+	}
+
+	return NewFormSerializationWriter(), nil
 }
