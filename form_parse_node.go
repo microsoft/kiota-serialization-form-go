@@ -161,14 +161,15 @@ func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]int
 	if n == nil || n.value == "" {
 		return nil, nil
 	}
-	if targetType == "" {
+	trimmedType := strings.TrimSpace(targetType)
+	if trimmedType == "" {
 		return nil, errors.New("targetType is empty")
 	}
 	valueList := strings.Split(n.value, ",")
 
 	result := make([]interface{}, len(valueList))
 	for i, element := range valueList {
-		val, err := getPrimitiveValue(element, targetType)
+		val, err := getPrimitiveValue(element, trimmedType)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +179,7 @@ func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]int
 }
 
 func getPrimitiveValue(value string, targetType string) (interface{}, error) {
-	switch targetType {
+	switch strings.ToLower(strings.TrimSpace(targetType)) {
 	case "string":
 		return getStringValue(value)
 	case "bool":
