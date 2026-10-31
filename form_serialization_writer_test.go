@@ -273,10 +273,77 @@ func TestFormSerializationWriterNilGuards(t *testing.T) {
 	var nilWriter *FormSerializationWriter
 	assert.NotPanics(t, func() {
 		content, err := nilWriter.GetSerializedContent()
-		assert.Error(t, err)
+		assert.EqualError(t, err, "writer cannot be nil")
 		assert.Nil(t, content)
 
 		err = nilWriter.Close()
 		assert.NoError(t, err)
+
+		strVal := "test"
+		assert.EqualError(t, nilWriter.WriteStringValue("k", &strVal), "writer cannot be nil")
+
+		boolVal := true
+		assert.EqualError(t, nilWriter.WriteBoolValue("k", &boolVal), "writer cannot be nil")
+
+		byteVal := byte(42)
+		assert.EqualError(t, nilWriter.WriteByteValue("k", &byteVal), "writer cannot be nil")
+
+		int8Val := int8(8)
+		assert.EqualError(t, nilWriter.WriteInt8Value("k", &int8Val), "writer cannot be nil")
+
+		int32Val := int32(32)
+		assert.EqualError(t, nilWriter.WriteInt32Value("k", &int32Val), "writer cannot be nil")
+
+		int64Val := int64(64)
+		assert.EqualError(t, nilWriter.WriteInt64Value("k", &int64Val), "writer cannot be nil")
+
+		float32Val := float32(3.14)
+		assert.EqualError(t, nilWriter.WriteFloat32Value("k", &float32Val), "writer cannot be nil")
+
+		float64Val := float64(6.28)
+		assert.EqualError(t, nilWriter.WriteFloat64Value("k", &float64Val), "writer cannot be nil")
+
+		timeVal := time.Now()
+		assert.EqualError(t, nilWriter.WriteTimeValue("k", &timeVal), "writer cannot be nil")
+
+		durationVal, _ := absser.ParseISODuration("PT1H")
+		assert.EqualError(t, nilWriter.WriteISODurationValue("k", durationVal), "writer cannot be nil")
+
+		timeOnlyVal, _ := absser.ParseTimeOnly("12:30:00")
+		assert.EqualError(t, nilWriter.WriteTimeOnlyValue("k", timeOnlyVal), "writer cannot be nil")
+
+		dateOnlyVal, _ := absser.ParseDateOnly("2026-10-23")
+		assert.EqualError(t, nilWriter.WriteDateOnlyValue("k", dateOnlyVal), "writer cannot be nil")
+
+		uuidVal := uuid.New()
+		assert.EqualError(t, nilWriter.WriteUUIDValue("k", &uuidVal), "writer cannot be nil")
+
+		assert.EqualError(t, nilWriter.WriteByteArrayValue("k", []byte{1, 2, 3}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteNullValue("k"), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteObjectValue("k", nil), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfObjectValues("k", nil), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteAnyValue("k", "any"), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteAdditionalData(map[string]interface{}{"k": "v"}), "writer cannot be nil")
+
+		assert.EqualError(t, nilWriter.WriteCollectionOfStringValues("k", []string{"a"}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfBoolValues("k", []bool{true}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfByteValues("k", []byte{1}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfInt8Values("k", []int8{1}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfInt32Values("k", []int32{1}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfInt64Values("k", []int64{1}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfFloat32Values("k", []float32{1.0}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfFloat64Values("k", []float64{1.0}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfTimeValues("k", []time.Time{timeVal}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfISODurationValues("k", []absser.ISODuration{*durationVal}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfTimeOnlyValues("k", []absser.TimeOnly{*timeOnlyVal}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfDateOnlyValues("k", []absser.DateOnly{*dateOnlyVal}), "writer cannot be nil")
+		assert.EqualError(t, nilWriter.WriteCollectionOfUUIDValues("k", []uuid.UUID{uuidVal}), "writer cannot be nil")
+
+		assert.Nil(t, nilWriter.GetOnBeforeSerialization())
+		assert.EqualError(t, nilWriter.SetOnBeforeSerialization(func(absser.Parsable) error { return nil }), "writer cannot be nil")
+		assert.Nil(t, nilWriter.GetOnAfterObjectSerialization())
+		assert.EqualError(t, nilWriter.SetOnAfterObjectSerialization(func(absser.Parsable) error { return nil }), "writer cannot be nil")
+		assert.Nil(t, nilWriter.GetOnStartObjectSerialization())
+		assert.EqualError(t, nilWriter.SetOnStartObjectSerialization(func(absser.Parsable, absser.SerializationWriter) error { return nil }), "writer cannot be nil")
 	})
 }
