@@ -52,7 +52,10 @@ func loadFields(value string) (map[string]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			if result[key] == "" {
+			if key == "" {
+				continue
+			}
+			if _, exists := result[key]; !exists {
 				result[key] = keyValue[1]
 			} else {
 				result[key] += "," + keyValue[1]
@@ -446,7 +449,11 @@ func getISODurationValue(value string) (*absser.ISODuration, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return absser.ParseISODuration(*v)
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return absser.ParseISODuration(trimmed)
 }
 
 // GetTimeOnlyValue returns a TimeOnly value from the nodes.
@@ -465,7 +472,11 @@ func getTimeOnlyValue(value string) (*absser.TimeOnly, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return absser.ParseTimeOnly(*v)
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return absser.ParseTimeOnly(trimmed)
 }
 
 // GetDateOnlyValue returns a DateOnly value from the nodes.
@@ -484,7 +495,11 @@ func getDateOnlyValue(value string) (*absser.DateOnly, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return absser.ParseDateOnly(*v)
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return absser.ParseDateOnly(trimmed)
 }
 
 // GetUUIDValue returns a UUID value from the nodes.
@@ -503,8 +518,15 @@ func getUUIDValue(value string) (*uuid.UUID, error) {
 	if v == nil {
 		return nil, nil
 	}
-	parsed, err := uuid.Parse(*v)
-	return &parsed, err
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 // GetEnumValue returns a Enum value from the nodes.
