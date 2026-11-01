@@ -230,6 +230,9 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 		return errors.New("nested objects serialization is not supported with FormSerializationWriter")
 	}
 	w.depth++
+	defer func() {
+		w.depth--
+	}()
 	additionalValuesLen := len(additionalValuesToMerge)
 	if item != nil || additionalValuesLen > 0 {
 		if key != "" {
@@ -242,11 +245,10 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 				return err
 			}
 			err = item.Serialize(w)
-
-			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), item)
 			if err != nil {
 				return err
 			}
+			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), item)
 		}
 
 		for _, additionalValue := range additionalValuesToMerge {
@@ -368,9 +370,9 @@ func (w *FormSerializationWriter) WriteAnyValue(key string, value interface{}) e
 
 // WriteAdditionalData writes additional data to underlying the byte array.
 func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface{}) error {
-	var err error
 	if len(value) != 0 {
 		for key, input := range value {
+			var err error
 			switch value := input.(type) {
 			case absser.Parsable:
 				err = w.WriteObjectValue(key, value)
@@ -388,6 +390,14 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 				err = w.WriteCollectionOfInt32Values(key, value)
 			case []int64:
 				err = w.WriteCollectionOfInt64Values(key, value)
+			case []int:
+				if value != nil {
+					vals := make([]int64, len(value))
+					for i, v := range value {
+						vals[i] = int64(v)
+					}
+					err = w.WriteCollectionOfInt64Values(key, vals)
+				}
 			case []float32:
 				err = w.WriteCollectionOfFloat32Values(key, value)
 			case []float64:
@@ -426,6 +436,14 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 				err = w.WriteInt64Value(key, value)
 			case int64:
 				err = w.WriteInt64Value(key, &value)
+			case *int:
+				if value != nil {
+					val64 := int64(*value)
+					err = w.WriteInt64Value(key, &val64)
+				}
+			case int:
+				val64 := int64(value)
+				err = w.WriteInt64Value(key, &val64)
 			case *float32:
 				err = w.WriteFloat32Value(key, value)
 			case float32:
@@ -455,9 +473,12 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 			case absser.DateOnly:
 				err = w.WriteDateOnlyValue(key, &value)
 			}
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 // Close clears the internal buffer.
@@ -466,6 +487,7 @@ func (w *FormSerializationWriter) Close() error {
 		return nil
 	}
 	w.writer = make([]string, 0)
+	w.depth = 0
 	return nil
 }
 
