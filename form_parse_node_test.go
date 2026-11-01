@@ -2,6 +2,7 @@ package formserialization
 
 import (
 	"errors"
+	"github.com/google/uuid"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -669,4 +670,102 @@ func TestFormParseNodeNilReceiverGuards(t *testing.T) {
 		assert.Nil(t, nilNode.GetOnAfterAssignFieldValues())
 		assert.Error(t, nilNode.SetOnAfterAssignFieldValues(func(absser.Parsable) error { return nil }))
 	})
+}
+
+func TestLoadFieldsPreservesInitialEmptyValuesAndSkipsEmptyKeys(t *testing.T) {
+	// Leading empty value for items collection and empty key in query string
+	node, err := NewFormParseNode([]byte("=emptykey&items=&items=second&foo=bar"))
+	require.NoError(t, err)
+
+	// Child node for items must contain both empty string and "second"
+	child, err := node.GetChildNode("items")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	values, err := child.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	require.Len(t, values, 2)
+	assert.Equal(t, "", *values[0].(*string))
+	assert.Equal(t, "second", *values[1].(*string))
+
+	// Empty key "=emptykey" must not be present in fields
+	emptyKeyChild, err := node.GetChildNode("")
+	assert.Error(t, err)
+	assert.Nil(t, emptyKeyChild)
+}
+
+func TestGetUUIDValueNilOnErrorAndTrim(t *testing.T) {
+	// Invalid UUID string should return (nil, error) without zero-UUID pointer
+	invalidNode, err := NewFormParseNode([]byte("id=not-a-valid-uuid"))
+	require.NoError(t, err)
+	idNode, err := invalidNode.GetChildNode("id")
+	require.NoError(t, err)
+	uuidVal, err := idNode.GetUUIDValue()
+	assert.Error(t, err)
+	assert.Nil(t, uuidVal, "returned pointer must be nil on error")
+
+	// Whitespace-padded UUID should parse correctly
+	validUUIDStr := "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+	paddedNode, err := NewFormParseNode([]byte("id=%20%20" + validUUIDStr + "%20%20"))
+	require.NoError(t, err)
+	paddedIdNode, err := paddedNode.GetChildNode("id")
+	require.NoError(t, err)
+	uuidVal, err = paddedIdNode.GetUUIDValue()
+	require.NoError(t, err)
+	require.NotNil(t, uuidVal)
+	expectedUUID, _ := uuid.Parse(validUUIDStr)
+	assert.Equal(t, expectedUUID, *uuidVal)
+
+	// Whitespace-only UUID should return (nil, nil)
+	whitespaceNode, err := NewFormParseNode([]byte("id=%20%20%20"))
+	require.NoError(t, err)
+	wsIdNode, err := whitespaceNode.GetChildNode("id")
+	require.NoError(t, err)
+	uuidVal, err = wsIdNode.GetUUIDValue()
+	require.NoError(t, err)
+	assert.Nil(t, uuidVal)
+}
+
+func TestTemporalParsersTrimWhitespace(t *testing.T) {
+	node, err := NewFormParseNode([]byte("duration=%20PT1H%20&time=%2012%3A30%3A00%20&date=%202026-11-01%20&emptyDuration=%20%20&emptyTime=%20%20&emptyDate=%20%20"))
+	require.NoError(t, err)
+
+	durNode, err := node.GetChildNode("duration")
+	require.NoError(t, err)
+	durVal, err := durNode.GetISODurationValue()
+	require.NoError(t, err)
+	require.NotNil(t, durVal)
+
+	timeNode, err := node.GetChildNode("time")
+	require.NoError(t, err)
+	timeVal, err := timeNode.GetTimeOnlyValue()
+	require.NoError(t, err)
+	require.NotNil(t, timeVal)
+	assert.Equal(t, "12:30:00", timeVal.String())
+
+	dateNode, err := node.GetChildNode("date")
+	require.NoError(t, err)
+	dateVal, err := dateNode.GetDateOnlyValue()
+	require.NoError(t, err)
+	require.NotNil(t, dateVal)
+	assert.Equal(t, "2026-11-01", dateVal.String())
+
+	// Empty / whitespace-only cases must return (nil, nil)
+	durNodeEmpty, err := node.GetChildNode("emptyDuration")
+	require.NoError(t, err)
+	durValEmpty, err := durNodeEmpty.GetISODurationValue()
+	require.NoError(t, err)
+	assert.Nil(t, durValEmpty)
+
+	timeNodeEmpty, err := node.GetChildNode("emptyTime")
+	require.NoError(t, err)
+	timeValEmpty, err := timeNodeEmpty.GetTimeOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, timeValEmpty)
+
+	dateNodeEmpty, err := node.GetChildNode("emptyDate")
+	require.NoError(t, err)
+	dateValEmpty, err := dateNodeEmpty.GetDateOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, dateValEmpty)
 }

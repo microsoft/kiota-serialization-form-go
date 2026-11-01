@@ -1,6 +1,7 @@
 package formserialization
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/microsoft/kiota-serialization-form-go/internal"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	assert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
 )
@@ -279,4 +281,132 @@ func TestFormSerializationWriterNilGuards(t *testing.T) {
 		err = nilWriter.Close()
 		assert.NoError(t, err)
 	})
+}
+
+type mockTestParsable struct {
+	serializeFunc func(absser.SerializationWriter) error
+}
+
+func (m *mockTestParsable) Serialize(writer absser.SerializationWriter) error {
+	if m.serializeFunc != nil {
+		return m.serializeFunc(writer)
+	}
+	return nil
+}
+
+func (m *mockTestParsable) GetFieldDeserializers() map[string]func(absser.ParseNode) error {
+	return make(map[string]func(absser.ParseNode) error)
+}
+
+func TestWriteObjectValueDepthLifecycleAndReusability(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+
+	// 1. First top-level object write
+	entity1 := internal.NewTestEntity()
+	id1 := "id-1"
+	entity1.SetId(&id1)
+	err := serializer.WriteObjectValue("entity1", entity1)
+	require.NoError(t, err)
+
+	// 2. Second top-level object write on the same writer without Close()
+	entity2 := internal.NewTestEntity()
+	id2 := "id-2"
+	entity2.SetId(&id2)
+	err = serializer.WriteObjectValue("entity2", entity2)
+	require.NoError(t, err)
+
+	// 3. Nested object serialization attempt inside Serialize() must fail
+	var nestedErr error
+	nestedEntity := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			child := internal.NewTestEntity()
+			nestedErr = w.WriteObjectValue("child", child)
+			return nestedErr
+		},
+	}
+	err = serializer.WriteObjectValue("nested", nestedEntity)
+	assert.Error(t, err)
+	assert.Error(t, nestedErr)
+	assert.Contains(t, nestedErr.Error(), "nested objects serialization is not supported")
+
+	// 4. After nested error, top-level depth must be restored so subsequent writes succeed
+	entity3 := internal.NewTestEntity()
+	id3 := "id-3"
+	entity3.SetId(&id3)
+	err = serializer.WriteObjectValue("entity3", entity3)
+	require.NoError(t, err)
+
+	// 5. Close() must reset depth to 0 and allow new writes
+	err = serializer.Close()
+	require.NoError(t, err)
+	err = serializer.WriteObjectValue("entity4", entity1)
+	require.NoError(t, err)
+}
+
+func TestWriteObjectValueSerializationErrorDoesNotInvokeOnAfter(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+
+	countAfter := 0
+	err := serializer.SetOnAfterObjectSerialization(func(parsable absser.Parsable) error {
+		countAfter++
+		return nil
+	})
+	require.NoError(t, err)
+
+	expectedErr := errors.New("failed serialization")
+	failingEntity := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			return expectedErr
+		},
+	}
+
+	err = serializer.WriteObjectValue("fail", failingEntity)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.Equal(t, 0, countAfter, "OnAfterObjectSerialization must not be called when Serialize fails")
+
+	// Verify depth was decremented even after error
+	entity := internal.NewTestEntity()
+	id := "test-id"
+	entity.SetId(&id)
+	err = serializer.WriteObjectValue("recovery", entity)
+	require.NoError(t, err)
+	assert.Equal(t, 1, countAfter, "OnAfterObjectSerialization should be called on successful write")
+}
+
+func TestWriteAdditionalDataErrorPropagationAndIntSupport(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+
+	// Test Go int, *int, and []int serialization
+	intVal := 42
+	intSlice := []int{10, 20}
+	additionalData := map[string]interface{}{
+		"plainInt": intVal,
+		"ptrInt":   &intVal,
+		"sliceInt": intSlice,
+	}
+	err := serializer.WriteAdditionalData(additionalData)
+	require.NoError(t, err)
+
+	content, err := serializer.GetSerializedContent()
+	require.NoError(t, err)
+	contentStr := string(content)
+	assert.Contains(t, contentStr, "plainInt=42")
+	assert.Contains(t, contentStr, "ptrInt=42")
+	assert.Contains(t, contentStr, "sliceInt=10")
+	assert.Contains(t, contentStr, "sliceInt=20")
+
+	// Test error propagation: error must not be swallowed by subsequent map entries
+	errSerializer := NewFormSerializationWriter()
+	failErr := errors.New("additional data parsable failed")
+	failingItem := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			return failErr
+		},
+	}
+	errData := map[string]interface{}{
+		"a_fail": failingItem,
+		"z_str":  "must_not_mask_error",
+	}
+	err = errSerializer.WriteAdditionalData(errData)
+	assert.Error(t, err)
 }
