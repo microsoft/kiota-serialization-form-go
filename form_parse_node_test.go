@@ -689,6 +689,9 @@ func TestLoadFieldsPreservesInitialEmptyValuesAndSkipsEmptyKeys(t *testing.T) {
 	assert.Equal(t, "second", *values[1].(*string))
 
 	// Empty key "=emptykey" must not be present in fields
+	assert.NotContains(t, node.fields, "")
+	_, hasEmptyKey := node.fields[""]
+	assert.False(t, hasEmptyKey, "fields must not contain an empty key")
 	emptyKeyChild, err := node.GetChildNode("")
 	assert.Error(t, err)
 	assert.Nil(t, emptyKeyChild)
