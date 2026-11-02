@@ -87,8 +87,8 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	fieldValue := n.fields[key]
-	if fieldValue == "" {
+	fieldValue, ok := n.fields[key]
+	if !ok {
 		return nil, nil
 	}
 
@@ -140,9 +140,11 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 				if err != nil {
 					return nil, err
 				}
-				err = field(childNode)
-				if err != nil {
-					return nil, err
+				if childNode != nil {
+					err = field(childNode)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -561,7 +563,11 @@ func getByteArrayValue(value string) ([]byte, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return base64.StdEncoding.DecodeString(*v)
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return base64.StdEncoding.DecodeString(trimmed)
 }
 
 // GetRawValue returns a ByteArray value from the nodes.

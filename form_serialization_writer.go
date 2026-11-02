@@ -333,6 +333,9 @@ func (w *FormSerializationWriter) WriteCollectionOfObjectValues(key string, coll
 	if w == nil {
 		return errors.New("writer cannot be nil")
 	}
+	if collection == nil {
+		return nil
+	}
 	return errors.New("collections serialization is not supported with FormSerializationWriter")
 }
 
@@ -466,6 +469,9 @@ func (w *FormSerializationWriter) GetSerializedContent() ([]byte, error) {
 func (w *FormSerializationWriter) WriteAnyValue(key string, value interface{}) error {
 	if w == nil {
 		return errors.New("writer cannot be nil")
+	}
+	if value == nil {
+		return nil
 	}
 	return errors.New("serialization of any value is not supported with FormSerializationWriter")
 }

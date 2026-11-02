@@ -804,3 +804,68 @@ func TestGetCollectionOfPrimitiveValuesCaseInsensitiveAndWhitespace(t *testing.T
 	_, err = node.GetCollectionOfPrimitiveValues("   ")
 	assert.EqualError(t, err, "targetType is empty")
 }
+
+
+func TestEmptyFieldDeserializationDoesNotPanic(t *testing.T) {
+	node, err := NewFormParseNode([]byte("officeLocation=&id=48d31887-5fad-4d73-a9f5-3c356e68a038"))
+	require.NoError(t, err)
+	result, err := node.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	entity := result.(internal.TestEntityable)
+	assert.Nil(t, entity.GetOfficeLocation())
+	assert.Equal(t, "48d31887-5fad-4d73-a9f5-3c356e68a038", *entity.GetId())
+}
+
+func TestGetChildNodeForEmptyAndMissingFields(t *testing.T) {
+	node, err := NewFormParseNode([]byte("emptyField=&populatedField=hello"))
+	require.NoError(t, err)
+
+	// Missing field returns (nil, nil)
+	missingChild, err := node.GetChildNode("missingField")
+	require.NoError(t, err)
+	assert.Nil(t, missingChild)
+
+	// Empty field returns a valid non-nil child node whose getters safely return (nil, nil)
+	emptyChild, err := node.GetChildNode("emptyField")
+	require.NoError(t, err)
+	require.NotNil(t, emptyChild)
+
+	strVal, err := emptyChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Nil(t, strVal)
+
+	intVal, err := emptyChild.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, intVal)
+
+	boolVal, err := emptyChild.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, boolVal)
+
+	byteVal, err := emptyChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, byteVal)
+}
+
+func TestGetByteArrayValueTrimsWhitespace(t *testing.T) {
+	// Base64 for "Hello World" is "SGVsbG8gV29ybGQ="
+	node, err := NewFormParseNode([]byte("data=%20%20SGVsbG8gV29ybGQ%3D%0A%20&emptyData=%20%20%0A%0D%20"))
+	require.NoError(t, err)
+
+	child, err := node.GetChildNode("data")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	val, err := child.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte("Hello World"), val)
+
+	emptyChild, err := node.GetChildNode("emptyData")
+	require.NoError(t, err)
+	require.NotNil(t, emptyChild)
+
+	emptyVal, err := emptyChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, emptyVal)
+}

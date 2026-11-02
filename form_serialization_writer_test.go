@@ -477,3 +477,25 @@ func TestWriteAdditionalDataErrorPropagationAndIntSupport(t *testing.T) {
 	err = errSerializer.WriteAdditionalData(errData)
 	assert.Error(t, err)
 }
+
+
+func TestWriteAnyValueAndCollectionOfObjectValuesNilSucceeds(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+	defer serializer.Close()
+
+	// Nil value should safely succeed without error
+	err := serializer.WriteAnyValue("key", nil)
+	assert.NoError(t, err)
+
+	// Non-nil value should return unsupported error
+	err = serializer.WriteAnyValue("key", "test")
+	assert.EqualError(t, err, "serialization of any value is not supported with FormSerializationWriter")
+
+	// Nil collection should safely succeed without error
+	err = serializer.WriteCollectionOfObjectValues("key", nil)
+	assert.NoError(t, err)
+
+	// Non-nil collection should return unsupported error
+	err = serializer.WriteCollectionOfObjectValues("key", []absser.Parsable{})
+	assert.EqualError(t, err, "collections serialization is not supported with FormSerializationWriter")
+}
