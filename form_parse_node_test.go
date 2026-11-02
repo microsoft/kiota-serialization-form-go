@@ -772,3 +772,35 @@ func TestTemporalParsersTrimWhitespace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, dateValEmpty)
 }
+
+func TestGetCollectionOfPrimitiveValuesCaseInsensitiveAndWhitespace(t *testing.T) {
+	assert.Equal(t,
+		[]interface{}{ref("milk"), ref("soda")},
+		getCollectionValues("id=2&item=milk&item=soda", "item", "String"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref("milk"), ref("soda")},
+		getCollectionValues("id=2&item=milk&item=soda", "item", "STRING"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(true), ref(false)},
+		getCollectionValues("id=2&item=true&item=false", "item", "Bool"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(int32(1)), ref(int32(2))},
+		getCollectionValues("id=2&item=1&item=2", "item", "Int32"),
+	)
+	assert.Equal(t,
+		[]interface{}{ref(float64(1.5)), ref(float64(2.5))},
+		getCollectionValues("id=2&item=1.5&item=2.5", "item", "Float64"),
+	)
+
+	node, err := NewFormParseNode([]byte("item=milk,soda"))
+	assert.NoError(t, err)
+
+	_, err = node.GetCollectionOfPrimitiveValues("")
+	assert.EqualError(t, err, "targetType is empty")
+
+	_, err = node.GetCollectionOfPrimitiveValues("   ")
+	assert.EqualError(t, err, "targetType is empty")
+}
