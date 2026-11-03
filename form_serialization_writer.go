@@ -290,40 +290,38 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 	defer func() {
 		w.depth--
 	}()
-	additionalValuesLen := len(additionalValuesToMerge)
-	if item != nil || additionalValuesLen > 0 {
-		if key != "" {
-			w.writePropertyName(key)
+	var values []absser.Parsable
+	if item != nil {
+		values = append(values, item)
+	}
+	for _, additionalValue := range additionalValuesToMerge {
+		if additionalValue != nil {
+			values = append(values, additionalValue)
 		}
-		abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), item)
-		if item != nil {
-			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), item, w)
-			if err != nil {
-				return err
-			}
-			err = item.Serialize(w)
-			if err != nil {
-				return err
-			}
-			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), item)
-		}
+	}
+	if len(values) == 0 {
+		return nil
+	}
 
-		for _, additionalValue := range additionalValuesToMerge {
-			abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), additionalValue)
-			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), additionalValue, w)
-			if err != nil {
-				return err
-			}
-			err = additionalValue.Serialize(w)
-			if err != nil {
-				return err
-			}
-			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), additionalValue)
-		}
+	if key != "" {
+		w.writePropertyName(key)
+	}
 
-		if key != "" {
-			w.writePropertySeparator()
+	for _, val := range values {
+		abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), val)
+		err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), val, w)
+		if err != nil {
+			return err
 		}
+		err = val.Serialize(w)
+		if err != nil {
+			return err
+		}
+		abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), val)
+	}
+
+	if key != "" {
+		w.writePropertySeparator()
 	}
 	return nil
 }
