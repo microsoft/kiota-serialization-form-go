@@ -499,3 +499,54 @@ func TestWriteAnyValueAndCollectionOfObjectValuesNilSucceeds(t *testing.T) {
 	err = serializer.WriteCollectionOfObjectValues("key", []absser.Parsable{})
 	assert.EqualError(t, err, "collections serialization is not supported with FormSerializationWriter")
 }
+
+func TestWriteObjectValueWithNilElementsAndCallbacks(t *testing.T) {
+	// 1. Calling WriteObjectValue with item == nil and all additionalValues nil should not write property or panic
+	serializer := NewFormSerializationWriter()
+	err := serializer.WriteObjectValue("emptyProp", nil, nil, nil)
+	require.NoError(t, err)
+	content, err := serializer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content, "must not emit property when all objects are nil")
+
+	// 2. Calling WriteObjectValue with item == nil but valid additional object should serialize valid object
+	serializer = NewFormSerializationWriter()
+	var beforeCalled []string
+	var afterCalled []string
+	err = serializer.SetOnBeforeSerialization(func(parsable absser.Parsable) error {
+		require.NotNil(t, parsable, "OnBeforeSerialization must never receive nil parsable")
+		if entity, ok := parsable.(internal.TestEntityable); ok && entity.GetId() != nil {
+			beforeCalled = append(beforeCalled, *entity.GetId())
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	err = serializer.SetOnAfterObjectSerialization(func(parsable absser.Parsable) error {
+		require.NotNil(t, parsable, "OnAfterObjectSerialization must never receive nil parsable")
+		if entity, ok := parsable.(internal.TestEntityable); ok && entity.GetId() != nil {
+			afterCalled = append(afterCalled, *entity.GetId())
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	entity1 := internal.NewTestEntity()
+	id1 := "id-1"
+	entity1.SetId(&id1)
+
+	entity2 := internal.NewTestEntity()
+	id2 := "id-2"
+	entity2.SetId(&id2)
+
+	// Pass nil item, valid entity1, nil additional, and valid entity2
+	err = serializer.WriteObjectValue("", nil, entity1, nil, entity2)
+	require.NoError(t, err)
+
+	content, err = serializer.GetSerializedContent()
+	require.NoError(t, err)
+	contentStr := string(content)
+	assert.Contains(t, contentStr, "id=id-1")
+	assert.Contains(t, contentStr, "id=id-2")
+	assert.Equal(t, []string{"id-1", "id-2"}, beforeCalled)
+	assert.Equal(t, []string{"id-1", "id-2"}, afterCalled)
+}

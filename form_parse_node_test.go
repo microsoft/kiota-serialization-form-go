@@ -869,3 +869,144 @@ func TestGetByteArrayValueTrimsWhitespace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, emptyVal)
 }
+
+func TestGetCollectionOfPrimitiveValuesIntAndByteArrayAliases(t *testing.T) {
+	// Test "int" alias mapping to int64
+	node, err := NewFormParseNode([]byte("numbers=10,20,30"))
+	require.NoError(t, err)
+	child, err := node.GetChildNode("numbers")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	intValues, err := child.GetCollectionOfPrimitiveValues("int")
+	require.NoError(t, err)
+	require.Len(t, intValues, 3)
+	assert.Equal(t, int64(10), *intValues[0].(*int64))
+	assert.Equal(t, int64(20), *intValues[1].(*int64))
+	assert.Equal(t, int64(30), *intValues[2].(*int64))
+
+	// Test "[]byte" and "bytearray" aliases
+	// "Hello" -> SGVsbG8=, "World" -> V29ybGQ=
+	byteNode, err := NewFormParseNode([]byte("blobs=SGVsbG8%3D,V29ybGQ%3D"))
+	require.NoError(t, err)
+	blobChild, err := byteNode.GetChildNode("blobs")
+	require.NoError(t, err)
+	require.NotNil(t, blobChild)
+
+	sliceByteValues, err := blobChild.GetCollectionOfPrimitiveValues("[]byte")
+	require.NoError(t, err)
+	require.Len(t, sliceByteValues, 2)
+	assert.Equal(t, []byte("Hello"), sliceByteValues[0].([]byte))
+	assert.Equal(t, []byte("World"), sliceByteValues[1].([]byte))
+
+	byteArrayValues, err := blobChild.GetCollectionOfPrimitiveValues("bytearray")
+	require.NoError(t, err)
+	require.Len(t, byteArrayValues, 2)
+	assert.Equal(t, []byte("Hello"), byteArrayValues[0].([]byte))
+	assert.Equal(t, []byte("World"), byteArrayValues[1].([]byte))
+}
+
+func TestPrimitiveNumericAndBoolParsersHandleWhitespaceAndEscapes(t *testing.T) {
+	// URL-encoded and whitespace-padded primitives
+	node, err := NewFormParseNode([]byte("b=%20true%20&i8=%20-120%20&u8=%20250%20&f32=%2012.5%20&f64=%20123.456%20&i32=%2042%20&i64=%209007199254740991%20&emptyB=%20&emptyNum=%20%20"))
+	require.NoError(t, err)
+
+	bNode, err := node.GetChildNode("b")
+	require.NoError(t, err)
+	bVal, err := bNode.GetBoolValue()
+	require.NoError(t, err)
+	require.NotNil(t, bVal)
+	assert.True(t, *bVal)
+
+	i8Node, err := node.GetChildNode("i8")
+	require.NoError(t, err)
+	i8Val, err := i8Node.GetInt8Value()
+	require.NoError(t, err)
+	require.NotNil(t, i8Val)
+	assert.Equal(t, int8(-120), *i8Val)
+
+	u8Node, err := node.GetChildNode("u8")
+	require.NoError(t, err)
+	u8Val, err := u8Node.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, u8Val)
+	assert.Equal(t, byte(250), *u8Val)
+
+	f32Node, err := node.GetChildNode("f32")
+	require.NoError(t, err)
+	f32Val, err := f32Node.GetFloat32Value()
+	require.NoError(t, err)
+	require.NotNil(t, f32Val)
+	assert.Equal(t, float32(12.5), *f32Val)
+
+	f64Node, err := node.GetChildNode("f64")
+	require.NoError(t, err)
+	f64Val, err := f64Node.GetFloat64Value()
+	require.NoError(t, err)
+	require.NotNil(t, f64Val)
+	assert.Equal(t, 123.456, *f64Val)
+
+	i32Node, err := node.GetChildNode("i32")
+	require.NoError(t, err)
+	i32Val, err := i32Node.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, i32Val)
+	assert.Equal(t, int32(42), *i32Val)
+
+	i64Node, err := node.GetChildNode("i64")
+	require.NoError(t, err)
+	i64Val, err := i64Node.GetInt64Value()
+	require.NoError(t, err)
+	require.NotNil(t, i64Val)
+	assert.Equal(t, int64(9007199254740991), *i64Val)
+
+	// Empty and whitespace-only return (nil, nil)
+	emptyBNode, err := node.GetChildNode("emptyB")
+	require.NoError(t, err)
+	emptyBVal, err := emptyBNode.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, emptyBVal)
+
+	emptyNumNode, err := node.GetChildNode("emptyNum")
+	require.NoError(t, err)
+	emptyI32Val, err := emptyNumNode.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, emptyI32Val)
+
+	emptyI64Val, err := emptyNumNode.GetInt64Value()
+	require.NoError(t, err)
+	assert.Nil(t, emptyI64Val)
+
+	emptyF64Val, err := emptyNumNode.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Nil(t, emptyF64Val)
+
+	// Comma-separated primitive collection with whitespace between elements
+	wsCollectionNode, err := NewFormParseNode([]byte("items=1,%202,%203&flags=true,%20false&floats=1.25,%202.5"))
+	require.NoError(t, err)
+
+	itemsChild, err := wsCollectionNode.GetChildNode("items")
+	require.NoError(t, err)
+	parsedItems, err := itemsChild.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, parsedItems, 3)
+	assert.Equal(t, int32(1), *parsedItems[0].(*int32))
+	assert.Equal(t, int32(2), *parsedItems[1].(*int32))
+	assert.Equal(t, int32(3), *parsedItems[2].(*int32))
+
+	flagsChild, err := wsCollectionNode.GetChildNode("flags")
+	require.NoError(t, err)
+	parsedFlags, err := flagsChild.GetCollectionOfPrimitiveValues("bool")
+	require.NoError(t, err)
+	require.Len(t, parsedFlags, 2)
+	assert.True(t, *parsedFlags[0].(*bool))
+	assert.False(t, *parsedFlags[1].(*bool))
+
+	floatsChild, err := wsCollectionNode.GetChildNode("floats")
+	require.NoError(t, err)
+	parsedFloats, err := floatsChild.GetCollectionOfPrimitiveValues("float64")
+	require.NoError(t, err)
+	require.Len(t, parsedFloats, 2)
+	assert.Equal(t, 1.25, *parsedFloats[0].(*float64))
+	assert.Equal(t, 2.5, *parsedFloats[1].(*float64))
+}
