@@ -5,6 +5,7 @@ import (
 	"errors"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -278,6 +279,19 @@ func (w *FormSerializationWriter) WriteByteArrayValue(key string, value []byte) 
 	return nil
 }
 
+func isNil(val any) bool {
+	if val == nil {
+		return true
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
 // WriteObjectValue writes a Parsable value to underlying the byte array.
 func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsable, additionalValuesToMerge ...absser.Parsable) error {
 	if w == nil {
@@ -291,11 +305,11 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 		w.depth--
 	}()
 	var values []absser.Parsable
-	if item != nil {
+	if !isNil(item) {
 		values = append(values, item)
 	}
 	for _, additionalValue := range additionalValuesToMerge {
-		if additionalValue != nil {
+		if !isNil(additionalValue) {
 			values = append(values, additionalValue)
 		}
 	}

@@ -1010,3 +1010,42 @@ func TestPrimitiveNumericAndBoolParsersHandleWhitespaceAndEscapes(t *testing.T) 
 	assert.Equal(t, 1.25, *parsedFloats[0].(*float64))
 	assert.Equal(t, 2.5, *parsedFloats[1].(*float64))
 }
+
+func TestFormParseNode_EncodedPositiveExponent(t *testing.T) {
+	// value=1e%2B3 should decode to 1000 for int32, int64, and collection variants
+	node, err := NewFormParseNode([]byte("val=1e%2B3&coll=1e%2B2,%202e%2B3"))
+	require.NoError(t, err)
+
+	valNode, err := node.GetChildNode("val")
+	require.NoError(t, err)
+
+	i64Val, err := valNode.GetInt64Value()
+	require.NoError(t, err)
+	require.NotNil(t, i64Val)
+	assert.Equal(t, int64(1000), *i64Val)
+
+	i32Val, err := valNode.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, i32Val)
+	assert.Equal(t, int32(1000), *i32Val)
+
+	f64Val, err := valNode.GetFloat64Value()
+	require.NoError(t, err)
+	require.NotNil(t, f64Val)
+	assert.Equal(t, float64(1000), *f64Val)
+
+	collNode, err := node.GetChildNode("coll")
+	require.NoError(t, err)
+
+	i64Coll, err := collNode.GetCollectionOfPrimitiveValues("int64")
+	require.NoError(t, err)
+	require.Len(t, i64Coll, 2)
+	assert.Equal(t, int64(100), *i64Coll[0].(*int64))
+	assert.Equal(t, int64(2000), *i64Coll[1].(*int64))
+
+	i32Coll, err := collNode.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, i32Coll, 2)
+	assert.Equal(t, int32(100), *i32Coll[0].(*int32))
+	assert.Equal(t, int32(2000), *i32Coll[1].(*int32))
+}

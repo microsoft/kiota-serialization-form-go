@@ -397,14 +397,11 @@ func (n *FormParseNode) GetInt32Value() (*int32, error) {
 
 func parseNumberAsInt64(value string) (int64, error) {
 	if strings.ContainsAny(value, ".eE") {
-		v, err := getFloat64Value(value)
+		f, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			return 0, err
 		}
-		if v == nil {
-			return 0, nil
-		}
-		if math.IsNaN(*v) || math.IsInf(*v, 0) {
+		if math.IsNaN(f) || math.IsInf(f, 0) {
 			return 0, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
 		}
 		r, ok := new(big.Rat).SetString(value)

@@ -549,4 +549,36 @@ func TestWriteObjectValueWithNilElementsAndCallbacks(t *testing.T) {
 	assert.Contains(t, contentStr, "id=id-2")
 	assert.Equal(t, []string{"id-1", "id-2"}, beforeCalled)
 	assert.Equal(t, []string{"id-1", "id-2"}, afterCalled)
+
+	// 3. Calling WriteObjectValue with typed-nil parsables should not invoke callbacks or panic
+	var typedNilEntity *internal.TestEntity
+	serializer = NewFormSerializationWriter()
+	err = serializer.SetOnBeforeSerialization(func(parsable absser.Parsable) error {
+		t.Fatal("OnBeforeSerialization must not be called for typed-nil parsable")
+		return nil
+	})
+	require.NoError(t, err)
+	err = serializer.SetOnAfterObjectSerialization(func(parsable absser.Parsable) error {
+		t.Fatal("OnAfterObjectSerialization must not be called for typed-nil parsable")
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.NotPanics(t, func() {
+		err = serializer.WriteObjectValue("typedNilProp", typedNilEntity, typedNilEntity, nil)
+	})
+	require.NoError(t, err)
+	content, err = serializer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content, "must not emit property when all objects are typed-nil")
+
+	// 4. Calling WriteObjectValue with typed-nil item and additional values mixed with valid entity
+	serializer = NewFormSerializationWriter()
+	assert.NotPanics(t, func() {
+		err = serializer.WriteObjectValue("", typedNilEntity, entity1, typedNilEntity)
+	})
+	require.NoError(t, err)
+	content, err = serializer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "id=id-1")
 }
