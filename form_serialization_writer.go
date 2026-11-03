@@ -5,6 +5,7 @@ import (
 	"errors"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -278,6 +279,19 @@ func (w *FormSerializationWriter) WriteByteArrayValue(key string, value []byte) 
 	return nil
 }
 
+func isNil(val any) bool {
+	if val == nil {
+		return true
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
 // WriteObjectValue writes a Parsable value to underlying the byte array.
 func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsable, additionalValuesToMerge ...absser.Parsable) error {
 	if w == nil {
@@ -290,40 +304,38 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 	defer func() {
 		w.depth--
 	}()
-	additionalValuesLen := len(additionalValuesToMerge)
-	if item != nil || additionalValuesLen > 0 {
-		if key != "" {
-			w.writePropertyName(key)
+	var values []absser.Parsable
+	if !isNil(item) {
+		values = append(values, item)
+	}
+	for _, additionalValue := range additionalValuesToMerge {
+		if !isNil(additionalValue) {
+			values = append(values, additionalValue)
 		}
-		abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), item)
-		if item != nil {
-			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), item, w)
-			if err != nil {
-				return err
-			}
-			err = item.Serialize(w)
-			if err != nil {
-				return err
-			}
-			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), item)
-		}
+	}
+	if len(values) == 0 {
+		return nil
+	}
 
-		for _, additionalValue := range additionalValuesToMerge {
-			abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), additionalValue)
-			err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), additionalValue, w)
-			if err != nil {
-				return err
-			}
-			err = additionalValue.Serialize(w)
-			if err != nil {
-				return err
-			}
-			abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), additionalValue)
-		}
+	if key != "" {
+		w.writePropertyName(key)
+	}
 
-		if key != "" {
-			w.writePropertySeparator()
+	for _, val := range values {
+		abstractions.InvokeParsableAction(w.GetOnBeforeSerialization(), val)
+		err := abstractions.InvokeParsableWriter(w.GetOnStartObjectSerialization(), val, w)
+		if err != nil {
+			return err
 		}
+		err = val.Serialize(w)
+		if err != nil {
+			return err
+		}
+		abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), val)
+	}
+
+	if key != "" {
+		w.writePropertySeparator()
 	}
 	return nil
 }
