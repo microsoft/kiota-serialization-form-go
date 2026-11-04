@@ -622,7 +622,6 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	writer := NewFormSerializationWriter()
 
 	require.NoError(t, writer.WriteStringValue("normalStr", ref("hello")))
-	require.NoError(t, writer.WriteNullValue("nullStr"))
 	require.NoError(t, writer.WriteNullValue("nullBool"))
 	require.NoError(t, writer.WriteNullValue("nullInt8"))
 	require.NoError(t, writer.WriteNullValue("nullByte"))
@@ -653,12 +652,6 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, normalVal)
 	assert.Equal(t, "hello", *normalVal)
-
-	nullStrChild, err := node.GetChildNode("nullStr")
-	require.NoError(t, err)
-	nullStrVal, err := nullStrChild.GetStringValue()
-	require.NoError(t, err)
-	assert.Nil(t, nullStrVal)
 
 	// Verify every typed primitive field parses to nil without syntax, range, or decode errors
 	boolChild, err := node.GetChildNode("nullBool")
@@ -765,4 +758,52 @@ func TestFormSerialization_ByteArrayRoundTrip_Base64NullPayload(t *testing.T) {
 	parsedBytes, err := child.GetByteArrayValue()
 	require.NoError(t, err)
 	assert.Equal(t, payload, parsedBytes)
+}
+
+func TestFormSerialization_StringRoundTrip_LiteralNullPayloads(t *testing.T) {
+	for _, literal := range []string{"null", "NULL", " Null ", "nullify", "NULL_VALUE"} {
+		writer := NewFormSerializationWriter()
+		err := writer.WriteStringValue("str", ref(literal))
+		require.NoError(t, err)
+
+		content, err := writer.GetSerializedContent()
+		require.NoError(t, err)
+
+		node, err := NewFormParseNode(content)
+		require.NoError(t, err)
+
+		child, err := node.GetChildNode("str")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		val, err := child.GetStringValue()
+		require.NoError(t, err)
+		require.NotNil(t, val)
+		assert.Equal(t, literal, *val)
+	}
+
+	// String collections containing literal nulls
+	writer := NewFormSerializationWriter()
+	err := writer.WriteCollectionOfStringValues("items", []string{"null", "NULL", "hello"})
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	child, err := node.GetChildNode("items")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	parsed, err := child.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	require.Len(t, parsed, 3)
+	require.NotNil(t, parsed[0])
+	assert.Equal(t, "null", *parsed[0].(*string))
+	require.NotNil(t, parsed[1])
+	assert.Equal(t, "NULL", *parsed[1].(*string))
+	require.NotNil(t, parsed[2])
+	assert.Equal(t, "hello", *parsed[2].(*string))
 }

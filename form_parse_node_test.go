@@ -1337,3 +1337,31 @@ func TestFormParseNode_ByteArrayValidBase64CasePayloads(t *testing.T) {
 	assert.Equal(t, []byte{158, 233, 101}, lowerBytes)
 }
 
+func TestFormParseNode_GetEnumValue_PreservesWhitespace(t *testing.T) {
+	received := ""
+	customFactory := func(val string) (interface{}, error) {
+		received = val
+		return val, nil
+	}
+
+	node, err := NewFormParseNode([]byte("status=%20ready%20"))
+	require.NoError(t, err)
+	child, err := node.GetChildNode("status")
+	require.NoError(t, err)
+
+	val, err := child.GetEnumValue(customFactory)
+	require.NoError(t, err)
+	assert.Equal(t, " ready ", val)
+	assert.Equal(t, " ready ", received)
+
+	// Ensure null enum still returns (nil, nil)
+	nullNode, err := NewFormParseNode([]byte("status=null"))
+	require.NoError(t, err)
+	nullChild, err := nullNode.GetChildNode("status")
+	require.NoError(t, err)
+
+	nullVal, err := nullChild.GetEnumValue(customFactory)
+	require.NoError(t, err)
+	assert.Nil(t, nullVal)
+}
+

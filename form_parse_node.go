@@ -266,9 +266,6 @@ func getStringValue(value string) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if isNullValue(res) {
-		return nil, nil
-	}
 	return &res, nil
 }
 
@@ -278,7 +275,7 @@ func getTrimmedValue(value string) (*string, error) {
 		return nil, err
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || isNullValue(trimmed) {
 		return nil, nil
 	}
 	return &trimmed, nil
@@ -557,7 +554,10 @@ func (n *FormParseNode) GetEnumValue(parser absser.EnumFactory) (interface{}, er
 	if err != nil || s == nil {
 		return nil, err
 	}
-	return parser(strings.TrimSpace(*s))
+	if isNullValue(*s) {
+		return nil, nil
+	}
+	return parser(*s)
 }
 
 // GetByteArrayValue returns a ByteArray value from the nodes.
