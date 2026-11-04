@@ -274,7 +274,7 @@ func getBoolValue(value string) (*bool, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	res, err := strconv.ParseBool(trimmed)
@@ -301,7 +301,7 @@ func getInt8Value(value string) (*int8, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	res, err := strconv.ParseInt(trimmed, 10, 8)
@@ -329,7 +329,7 @@ func getByteValue(value string) (*byte, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	res, err := strconv.ParseUint(trimmed, 10, 8)
@@ -377,7 +377,7 @@ func getFloat64Value(value string) (*float64, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	res, err := strconv.ParseFloat(trimmed, 64)
@@ -428,7 +428,7 @@ func getInt32Value(value string) (*int32, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	val, err := parseNumberAsInt64(trimmed)
@@ -459,7 +459,7 @@ func getInt64Value(value string) (*int64, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	val, err := parseNumberAsInt64(trimmed)
@@ -486,7 +486,7 @@ func getTimeValue(value string) (*time.Time, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	parsed, err := time.Parse(time.RFC3339, trimmed)
@@ -516,7 +516,7 @@ func getISODurationValue(value string) (*absser.ISODuration, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	return absser.ParseISODuration(trimmed)
@@ -539,7 +539,7 @@ func getTimeOnlyValue(value string) (*absser.TimeOnly, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	return absser.ParseTimeOnly(trimmed)
@@ -562,7 +562,7 @@ func getDateOnlyValue(value string) (*absser.DateOnly, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	return absser.ParseDateOnly(trimmed)
@@ -585,7 +585,7 @@ func getUUIDValue(value string) (*uuid.UUID, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	parsed, err := uuid.Parse(trimmed)
@@ -604,7 +604,7 @@ func (n *FormParseNode) GetEnumValue(parser absser.EnumFactory) (interface{}, er
 	if err != nil {
 		return nil, err
 	}
-	if s == nil {
+	if s == nil || strings.EqualFold(*s, "null") {
 		return nil, nil
 	}
 	return parser(*s)
@@ -627,7 +627,7 @@ func getByteArrayValue(value string) ([]byte, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
+	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
 	return base64.StdEncoding.DecodeString(trimmed)
