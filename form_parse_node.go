@@ -187,31 +187,31 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 	switch strings.ToLower(strings.TrimSpace(targetType)) {
 	case "string":
 		return getStringValue(value)
-	case "bool":
+	case "bool", "boolean":
 		return getBoolValue(value)
 	case "int8", "uint8":
 		return getInt8Value(value)
 	case "byte":
 		return getByteValue(value)
-	case "float32":
+	case "float32", "float":
 		return getFloat32Value(value)
-	case "float64":
+	case "float64", "double":
 		return getFloat64Value(value)
 	case "int32":
 		return getInt32Value(value)
-	case "int64", "int":
+	case "int64", "int", "integer":
 		return getInt64Value(value)
-	case "time":
+	case "time", "datetime", "date-time":
 		return getTimeValue(value)
 	case "timeonly":
 		return getTimeOnlyValue(value)
 	case "dateonly":
 		return getDateOnlyValue(value)
-	case "isoduration":
+	case "isoduration", "duration":
 		return getISODurationValue(value)
 	case "uuid":
 		return getUUIDValue(value)
-	case "base64", "[]byte", "bytearray":
+	case "base64", "[]byte", "bytearray", "binary":
 		return getByteArrayValue(value)
 	default:
 		return nil, errors.New("targetType is not supported")

@@ -482,7 +482,7 @@ func (w *FormSerializationWriter) WriteAnyValue(key string, value interface{}) e
 	if w == nil {
 		return errors.New("writer cannot be nil")
 	}
-	if value == nil {
+	if isNil(value) {
 		return nil
 	}
 	return errors.New("serialization of any value is not supported with FormSerializationWriter")
