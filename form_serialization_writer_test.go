@@ -622,6 +622,7 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	writer := NewFormSerializationWriter()
 
 	require.NoError(t, writer.WriteStringValue("normalStr", ref("hello")))
+	require.NoError(t, writer.WriteNullValue("nullStr"))
 	require.NoError(t, writer.WriteNullValue("nullBool"))
 	require.NoError(t, writer.WriteNullValue("nullInt8"))
 	require.NoError(t, writer.WriteNullValue("nullByte"))
@@ -652,6 +653,12 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, normalVal)
 	assert.Equal(t, "hello", *normalVal)
+
+	nullStrChild, err := node.GetChildNode("nullStr")
+	require.NoError(t, err)
+	nullStrVal, err := nullStrChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Nil(t, nullStrVal)
 
 	// Verify every typed primitive field parses to nil without syntax, range, or decode errors
 	boolChild, err := node.GetChildNode("nullBool")

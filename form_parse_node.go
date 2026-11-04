@@ -257,12 +257,31 @@ func (n *FormParseNode) GetStringValue() (*string, error) {
 	return getStringValue(n.value)
 }
 
+func isNullValue(value string) bool {
+	return strings.EqualFold(strings.TrimSpace(value), "null")
+}
+
 func getStringValue(value string) (*string, error) {
 	res, err := url.QueryUnescape(value)
 	if err != nil {
 		return nil, err
 	}
+	if isNullValue(res) {
+		return nil, nil
+	}
 	return &res, nil
+}
+
+func getTrimmedValue(value string) (*string, error) {
+	v, err := getStringValue(value)
+	if err != nil || v == nil {
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return &trimmed, nil
 }
 
 // GetBoolValue returns a Bool value from the nodes.
@@ -274,18 +293,11 @@ func (n *FormParseNode) GetBoolValue() (*bool, error) {
 }
 
 func getBoolValue(value string) (*bool, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	res, err := strconv.ParseBool(trimmed)
+	res, err := strconv.ParseBool(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -301,18 +313,11 @@ func (n *FormParseNode) GetInt8Value() (*int8, error) {
 }
 
 func getInt8Value(value string) (*int8, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -332,18 +337,11 @@ func (n *FormParseNode) GetByteValue() (*byte, error) {
 }
 
 func getByteValue(value string) (*byte, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -364,11 +362,8 @@ func (n *FormParseNode) GetFloat32Value() (*float32, error) {
 
 func getFloat32Value(value string) (*float32, error) {
 	v, err := getFloat64Value(value)
-	if err != nil {
+	if err != nil || v == nil {
 		return nil, err
-	}
-	if v == nil {
-		return nil, nil
 	}
 	cast := float32(*v)
 	return &cast, nil
@@ -383,18 +378,11 @@ func (n *FormParseNode) GetFloat64Value() (*float64, error) {
 }
 
 func getFloat64Value(value string) (*float64, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	res, err := strconv.ParseFloat(trimmed, 64)
+	res, err := strconv.ParseFloat(*v, 64)
 	if err != nil {
 		return nil, err
 	}
@@ -434,18 +422,11 @@ func parseNumberAsInt64(value string) (int64, error) {
 }
 
 func getInt32Value(value string) (*int32, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -465,18 +446,11 @@ func (n *FormParseNode) GetInt64Value() (*int64, error) {
 }
 
 func getInt64Value(value string) (*int64, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -492,20 +466,13 @@ func (n *FormParseNode) GetTimeValue() (*time.Time, error) {
 }
 
 func getTimeValue(value string) (*time.Time, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	parsed, err := time.Parse(time.RFC3339, trimmed)
+	parsed, err := time.Parse(time.RFC3339, *v)
 	if err != nil {
-		parsed, err = time.Parse(time.RFC3339Nano, trimmed)
+		parsed, err = time.Parse(time.RFC3339Nano, *v)
 		if err != nil {
 			return nil, err
 		}
@@ -522,18 +489,11 @@ func (n *FormParseNode) GetISODurationValue() (*absser.ISODuration, error) {
 }
 
 func getISODurationValue(value string) (*absser.ISODuration, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	return absser.ParseISODuration(trimmed)
+	return absser.ParseISODuration(*v)
 }
 
 // GetTimeOnlyValue returns a TimeOnly value from the nodes.
@@ -545,18 +505,11 @@ func (n *FormParseNode) GetTimeOnlyValue() (*absser.TimeOnly, error) {
 }
 
 func getTimeOnlyValue(value string) (*absser.TimeOnly, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	return absser.ParseTimeOnly(trimmed)
+	return absser.ParseTimeOnly(*v)
 }
 
 // GetDateOnlyValue returns a DateOnly value from the nodes.
@@ -568,18 +521,11 @@ func (n *FormParseNode) GetDateOnlyValue() (*absser.DateOnly, error) {
 }
 
 func getDateOnlyValue(value string) (*absser.DateOnly, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	return absser.ParseDateOnly(trimmed)
+	return absser.ParseDateOnly(*v)
 }
 
 // GetUUIDValue returns a UUID value from the nodes.
@@ -591,18 +537,11 @@ func (n *FormParseNode) GetUUIDValue() (*uuid.UUID, error) {
 }
 
 func getUUIDValue(value string) (*uuid.UUID, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
-		return nil, nil
-	}
-	parsed, err := uuid.Parse(trimmed)
+	parsed, err := uuid.Parse(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -615,13 +554,10 @@ func (n *FormParseNode) GetEnumValue(parser absser.EnumFactory) (interface{}, er
 		return nil, errors.New("parser is nil")
 	}
 	s, err := n.GetStringValue()
-	if err != nil {
+	if err != nil || s == nil {
 		return nil, err
 	}
-	if s == nil || strings.EqualFold(*s, "null") {
-		return nil, nil
-	}
-	return parser(*s)
+	return parser(strings.TrimSpace(*s))
 }
 
 // GetByteArrayValue returns a ByteArray value from the nodes.
@@ -633,14 +569,11 @@ func (n *FormParseNode) GetByteArrayValue() ([]byte, error) {
 }
 
 func getByteArrayValue(value string) ([]byte, error) {
-	v, err := getStringValue(value)
+	res, err := url.QueryUnescape(value)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
+	trimmed := strings.TrimSpace(res)
 	if trimmed == "" {
 		return nil, nil
 	}
