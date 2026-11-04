@@ -634,7 +634,8 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	require.NoError(t, writer.WriteNullValue("nullTimeOnly"))
 	require.NoError(t, writer.WriteNullValue("nullDateOnly"))
 	require.NoError(t, writer.WriteNullValue("nullUUID"))
-	require.NoError(t, writer.WriteNullValue("nullBytes"))
+	require.NoError(t, writer.WriteByteArrayValue("nilBytes", nil))
+	require.NoError(t, writer.WriteByteArrayValue("emptyBytes", []byte{}))
 
 	content, err := writer.GetSerializedContent()
 	require.NoError(t, err)
@@ -725,9 +726,36 @@ func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, uuidVal)
 
-	bytesChild, err := node.GetChildNode("nullBytes")
+	nilBytesChild, err := node.GetChildNode("nilBytes")
 	require.NoError(t, err)
-	bytesVal, err := bytesChild.GetByteArrayValue()
+	assert.Nil(t, nilBytesChild)
+
+	emptyBytesChild, err := node.GetChildNode("emptyBytes")
 	require.NoError(t, err)
-	assert.Nil(t, bytesVal)
+	require.NotNil(t, emptyBytesChild)
+	emptyBytesVal, err := emptyBytesChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, emptyBytesVal)
+}
+
+func TestFormSerialization_ByteArrayRoundTrip_Base64NullPayload(t *testing.T) {
+	writer := NewFormSerializationWriter()
+	payload := []byte{158, 233, 101}
+	err := writer.WriteByteArrayValue("data", payload)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "data=null", string(content))
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	child, err := node.GetChildNode("data")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	parsedBytes, err := child.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, payload, parsedBytes)
 }

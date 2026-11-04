@@ -1052,7 +1052,7 @@ func TestFormParseNode_EncodedPositiveExponent(t *testing.T) {
 
 func TestFormParseNode_NullMarkerAcrossPrimitiveTypes(t *testing.T) {
 	// Form encoded query string with "null" values across various primitive fields
-	source := "bVal=null&i8Val=null&byteVal=null&i32Val=null&i64Val=null&f32Val=null&f64Val=null&tVal=null&durVal=null&toVal=null&doVal=null&uuidVal=null&bytesVal=null&enumVal=null"
+	source := "bVal=null&i8Val=null&byteVal=null&i32Val=null&i64Val=null&f32Val=null&f64Val=null&tVal=null&durVal=null&toVal=null&doVal=null&uuidVal=null&bytesVal=&b64Bytes=null&enumVal=null"
 	node, err := NewFormParseNode([]byte(source))
 	require.NoError(t, err)
 
@@ -1134,6 +1134,12 @@ func TestFormParseNode_NullMarkerAcrossPrimitiveTypes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, bytesVal)
 
+	b64BytesNode, err := node.GetChildNode("b64Bytes")
+	require.NoError(t, err)
+	b64BytesVal, err := b64BytesNode.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{158, 233, 101}, b64BytesVal)
+
 	enumNode, err := node.GetChildNode("enumVal")
 	require.NoError(t, err)
 	enumVal, err := enumNode.GetEnumValue(testColorFactory)
@@ -1163,6 +1169,7 @@ func TestFormParseNode_NullMarkerCaseInsensitiveAndCollections(t *testing.T) {
 	require.Len(t, parsed, 3)
 	assert.Equal(t, int32(1), *parsed[0].(*int32))
 	assert.Nil(t, parsed[1])
+	assert.True(t, parsed[1] == nil)
 	assert.Equal(t, int32(2), *parsed[2].(*int32))
 }
 
@@ -1306,3 +1313,27 @@ func TestFormParseNode_PrimitiveCollectionSchemaAliases(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, timesDash, 2)
 }
+
+func TestFormParseNode_ByteArrayValidBase64CasePayloads(t *testing.T) {
+	node, err := NewFormParseNode([]byte("upper=NULL&mixed=Null&lower=null"))
+	require.NoError(t, err)
+
+	upperChild, err := node.GetChildNode("upper")
+	require.NoError(t, err)
+	upperBytes, err := upperChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{53, 66, 203}, upperBytes)
+
+	mixedChild, err := node.GetChildNode("mixed")
+	require.NoError(t, err)
+	mixedBytes, err := mixedChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{54, 233, 101}, mixedBytes)
+
+	lowerChild, err := node.GetChildNode("lower")
+	require.NoError(t, err)
+	lowerBytes, err := lowerChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{158, 233, 101}, lowerBytes)
+}
+

@@ -178,7 +178,11 @@ func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]int
 		if err != nil {
 			return nil, err
 		}
-		result[i] = val
+		if isNil(val) {
+			result[i] = nil
+		} else {
+			result[i] = val
+		}
 	}
 	return result, nil
 }
@@ -236,7 +240,11 @@ func (n *FormParseNode) GetCollectionOfEnumValues(parser absser.EnumFactory) ([]
 		if err != nil {
 			return nil, err
 		}
-		result[i] = val
+		if isNil(val) {
+			result[i] = nil
+		} else {
+			result[i] = val
+		}
 	}
 	return result, nil
 }
@@ -633,7 +641,7 @@ func getByteArrayValue(value string) ([]byte, error) {
 		return nil, nil
 	}
 	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" || strings.EqualFold(trimmed, "null") {
+	if trimmed == "" {
 		return nil, nil
 	}
 	return base64.StdEncoding.DecodeString(trimmed)
