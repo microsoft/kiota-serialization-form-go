@@ -1049,3 +1049,119 @@ func TestFormParseNode_EncodedPositiveExponent(t *testing.T) {
 	assert.Equal(t, int32(100), *i32Coll[0].(*int32))
 	assert.Equal(t, int32(2000), *i32Coll[1].(*int32))
 }
+
+func TestFormParseNode_NullMarkerAcrossPrimitiveTypes(t *testing.T) {
+	// Form encoded query string with "null" values across various primitive fields
+	source := "bVal=null&i8Val=null&byteVal=null&i32Val=null&i64Val=null&f32Val=null&f64Val=null&tVal=null&durVal=null&toVal=null&doVal=null&uuidVal=null&bytesVal=null&enumVal=null"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	bNode, err := node.GetChildNode("bVal")
+	require.NoError(t, err)
+	bVal, err := bNode.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	i8Node, err := node.GetChildNode("i8Val")
+	require.NoError(t, err)
+	i8Val, err := i8Node.GetInt8Value()
+	require.NoError(t, err)
+	assert.Nil(t, i8Val)
+
+	byteNode, err := node.GetChildNode("byteVal")
+	require.NoError(t, err)
+	byteVal, err := byteNode.GetByteValue()
+	require.NoError(t, err)
+	assert.Nil(t, byteVal)
+
+	i32Node, err := node.GetChildNode("i32Val")
+	require.NoError(t, err)
+	i32Val, err := i32Node.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	i64Node, err := node.GetChildNode("i64Val")
+	require.NoError(t, err)
+	i64Val, err := i64Node.GetInt64Value()
+	require.NoError(t, err)
+	assert.Nil(t, i64Val)
+
+	f32Node, err := node.GetChildNode("f32Val")
+	require.NoError(t, err)
+	f32Val, err := f32Node.GetFloat32Value()
+	require.NoError(t, err)
+	assert.Nil(t, f32Val)
+
+	f64Node, err := node.GetChildNode("f64Val")
+	require.NoError(t, err)
+	f64Val, err := f64Node.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Nil(t, f64Val)
+
+	tNode, err := node.GetChildNode("tVal")
+	require.NoError(t, err)
+	tVal, err := tNode.GetTimeValue()
+	require.NoError(t, err)
+	assert.Nil(t, tVal)
+
+	durNode, err := node.GetChildNode("durVal")
+	require.NoError(t, err)
+	durVal, err := durNode.GetISODurationValue()
+	require.NoError(t, err)
+	assert.Nil(t, durVal)
+
+	toNode, err := node.GetChildNode("toVal")
+	require.NoError(t, err)
+	toVal, err := toNode.GetTimeOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, toVal)
+
+	doNode, err := node.GetChildNode("doVal")
+	require.NoError(t, err)
+	doVal, err := doNode.GetDateOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, doVal)
+
+	uuidNode, err := node.GetChildNode("uuidVal")
+	require.NoError(t, err)
+	uuidVal, err := uuidNode.GetUUIDValue()
+	require.NoError(t, err)
+	assert.Nil(t, uuidVal)
+
+	bytesNode, err := node.GetChildNode("bytesVal")
+	require.NoError(t, err)
+	bytesVal, err := bytesNode.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, bytesVal)
+
+	enumNode, err := node.GetChildNode("enumVal")
+	require.NoError(t, err)
+	enumVal, err := enumNode.GetEnumValue(testColorFactory)
+	require.NoError(t, err)
+	assert.Nil(t, enumVal)
+}
+
+func TestFormParseNode_NullMarkerCaseInsensitiveAndCollections(t *testing.T) {
+	source := "upper=NULL&coll=1,null,2"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	upperNode, err := node.GetChildNode("upper")
+	require.NoError(t, err)
+	i32Val, err := upperNode.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	bVal, err := upperNode.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	collNode, err := node.GetChildNode("coll")
+	require.NoError(t, err)
+	parsed, err := collNode.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, parsed, 3)
+	assert.Equal(t, int32(1), *parsed[0].(*int32))
+	assert.Nil(t, parsed[1])
+	assert.Equal(t, int32(2), *parsed[2].(*int32))
+}
