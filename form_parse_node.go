@@ -304,11 +304,14 @@ func getInt8Value(value string) (*int8, error) {
 	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
-	res, err := strconv.ParseInt(trimmed, 10, 8)
+	val, err := parseNumberAsInt64(trimmed)
 	if err != nil {
 		return nil, err
 	}
-	cast := int8(res)
+	if val > math.MaxInt8 || val < math.MinInt8 {
+		return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
+	}
+	cast := int8(val)
 	return &cast, nil
 }
 
@@ -332,11 +335,14 @@ func getByteValue(value string) (*byte, error) {
 	if trimmed == "" || strings.EqualFold(trimmed, "null") {
 		return nil, nil
 	}
-	res, err := strconv.ParseUint(trimmed, 10, 8)
+	val, err := parseNumberAsInt64(trimmed)
 	if err != nil {
 		return nil, err
 	}
-	cast := byte(res)
+	if val > math.MaxUint8 || val < 0 {
+		return nil, &strconv.NumError{Func: "ParseUint", Num: value, Err: strconv.ErrRange}
+	}
+	cast := byte(val)
 	return &cast, nil
 }
 
