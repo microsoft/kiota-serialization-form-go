@@ -582,3 +582,38 @@ func TestWriteObjectValueWithNilElementsAndCallbacks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "id=id-1")
 }
+
+func TestWriteAnyValue_TypedNilSafety(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+
+	var pStr *string = nil
+	err := serializer.WriteAnyValue("nilStr", pStr)
+	assert.NoError(t, err)
+
+	var pInt *int32 = nil
+	err = serializer.WriteAnyValue("nilInt", pInt)
+	assert.NoError(t, err)
+
+	var pEntity *internal.TestEntity = nil
+	err = serializer.WriteAnyValue("nilEntity", pEntity)
+	assert.NoError(t, err)
+
+	var pSlice []string = nil
+	err = serializer.WriteAnyValue("nilSlice", pSlice)
+	assert.NoError(t, err)
+
+	var pMap map[string]string = nil
+	err = serializer.WriteAnyValue("nilMap", pMap)
+	assert.NoError(t, err)
+
+	err = serializer.WriteAnyValue("rawNil", nil)
+	assert.NoError(t, err)
+
+	// Non-nil value must return error as FormSerializationWriter doesn't support any-value serialization
+	err = serializer.WriteAnyValue("strVal", "not-nil")
+	assert.Error(t, err)
+
+	content, err := serializer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content)
+}

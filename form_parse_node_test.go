@@ -1244,3 +1244,65 @@ func TestFormParseNode_Int8AndByteExponentAndBounds(t *testing.T) {
 	_, err = bLargeChild.GetByteValue()
 	assert.Error(t, err)
 }
+
+func TestFormParseNode_PrimitiveCollectionSchemaAliases(t *testing.T) {
+	source := "bools=true,false&doubles=1.5,2.5&floats=3.5,4.5&ints=10,20&bins=AQID,BAUG&durs=PT1H,PT2M&times=2022-01-01T00:00:00Z,2022-01-02T00:00:00Z"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	boolsChild, err := node.GetChildNode("bools")
+	require.NoError(t, err)
+	bools, err := boolsChild.GetCollectionOfPrimitiveValues("boolean")
+	require.NoError(t, err)
+	require.Len(t, bools, 2)
+	assert.True(t, *bools[0].(*bool))
+	assert.False(t, *bools[1].(*bool))
+
+	doublesChild, err := node.GetChildNode("doubles")
+	require.NoError(t, err)
+	doubles, err := doublesChild.GetCollectionOfPrimitiveValues("double")
+	require.NoError(t, err)
+	require.Len(t, doubles, 2)
+	assert.Equal(t, 1.5, *doubles[0].(*float64))
+	assert.Equal(t, 2.5, *doubles[1].(*float64))
+
+	floatsChild, err := node.GetChildNode("floats")
+	require.NoError(t, err)
+	floats, err := floatsChild.GetCollectionOfPrimitiveValues("float")
+	require.NoError(t, err)
+	require.Len(t, floats, 2)
+	assert.Equal(t, float32(3.5), *floats[0].(*float32))
+	assert.Equal(t, float32(4.5), *floats[1].(*float32))
+
+	intsChild, err := node.GetChildNode("ints")
+	require.NoError(t, err)
+	ints, err := intsChild.GetCollectionOfPrimitiveValues("integer")
+	require.NoError(t, err)
+	require.Len(t, ints, 2)
+	assert.Equal(t, int64(10), *ints[0].(*int64))
+	assert.Equal(t, int64(20), *ints[1].(*int64))
+
+	binsChild, err := node.GetChildNode("bins")
+	require.NoError(t, err)
+	bins, err := binsChild.GetCollectionOfPrimitiveValues("binary")
+	require.NoError(t, err)
+	require.Len(t, bins, 2)
+	assert.Equal(t, []byte{1, 2, 3}, bins[0].([]byte))
+	assert.Equal(t, []byte{4, 5, 6}, bins[1].([]byte))
+
+	dursChild, err := node.GetChildNode("durs")
+	require.NoError(t, err)
+	durs, err := dursChild.GetCollectionOfPrimitiveValues("duration")
+	require.NoError(t, err)
+	require.Len(t, durs, 2)
+
+	timesChild, err := node.GetChildNode("times")
+	require.NoError(t, err)
+	timesDt, err := timesChild.GetCollectionOfPrimitiveValues("datetime")
+	require.NoError(t, err)
+	require.Len(t, timesDt, 2)
+
+	timesDash, err := timesChild.GetCollectionOfPrimitiveValues("date-time")
+	require.NoError(t, err)
+	require.Len(t, timesDash, 2)
+}
