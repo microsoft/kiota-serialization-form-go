@@ -617,3 +617,117 @@ func TestWriteAnyValue_TypedNilSafety(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, content)
 }
+
+func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
+	writer := NewFormSerializationWriter()
+
+	require.NoError(t, writer.WriteStringValue("normalStr", ref("hello")))
+	require.NoError(t, writer.WriteNullValue("nullBool"))
+	require.NoError(t, writer.WriteNullValue("nullInt8"))
+	require.NoError(t, writer.WriteNullValue("nullByte"))
+	require.NoError(t, writer.WriteNullValue("nullInt32"))
+	require.NoError(t, writer.WriteNullValue("nullInt64"))
+	require.NoError(t, writer.WriteNullValue("nullFloat32"))
+	require.NoError(t, writer.WriteNullValue("nullFloat64"))
+	require.NoError(t, writer.WriteNullValue("nullTime"))
+	require.NoError(t, writer.WriteNullValue("nullDuration"))
+	require.NoError(t, writer.WriteNullValue("nullTimeOnly"))
+	require.NoError(t, writer.WriteNullValue("nullDateOnly"))
+	require.NoError(t, writer.WriteNullValue("nullUUID"))
+	require.NoError(t, writer.WriteNullValue("nullBytes"))
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.NotEmpty(t, content)
+
+	// Round-trip parse using FormParseNode
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	// Verify normal string parses correctly
+	normalChild, err := node.GetChildNode("normalStr")
+	require.NoError(t, err)
+	normalVal, err := normalChild.GetStringValue()
+	require.NoError(t, err)
+	require.NotNil(t, normalVal)
+	assert.Equal(t, "hello", *normalVal)
+
+	// Verify every typed primitive field parses to nil without syntax, range, or decode errors
+	boolChild, err := node.GetChildNode("nullBool")
+	require.NoError(t, err)
+	bVal, err := boolChild.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	i8Child, err := node.GetChildNode("nullInt8")
+	require.NoError(t, err)
+	i8Val, err := i8Child.GetInt8Value()
+	require.NoError(t, err)
+	assert.Nil(t, i8Val)
+
+	byteChild, err := node.GetChildNode("nullByte")
+	require.NoError(t, err)
+	byteVal, err := byteChild.GetByteValue()
+	require.NoError(t, err)
+	assert.Nil(t, byteVal)
+
+	i32Child, err := node.GetChildNode("nullInt32")
+	require.NoError(t, err)
+	i32Val, err := i32Child.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	i64Child, err := node.GetChildNode("nullInt64")
+	require.NoError(t, err)
+	i64Val, err := i64Child.GetInt64Value()
+	require.NoError(t, err)
+	assert.Nil(t, i64Val)
+
+	f32Child, err := node.GetChildNode("nullFloat32")
+	require.NoError(t, err)
+	f32Val, err := f32Child.GetFloat32Value()
+	require.NoError(t, err)
+	assert.Nil(t, f32Val)
+
+	f64Child, err := node.GetChildNode("nullFloat64")
+	require.NoError(t, err)
+	f64Val, err := f64Child.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Nil(t, f64Val)
+
+	timeChild, err := node.GetChildNode("nullTime")
+	require.NoError(t, err)
+	timeVal, err := timeChild.GetTimeValue()
+	require.NoError(t, err)
+	assert.Nil(t, timeVal)
+
+	durChild, err := node.GetChildNode("nullDuration")
+	require.NoError(t, err)
+	durVal, err := durChild.GetISODurationValue()
+	require.NoError(t, err)
+	assert.Nil(t, durVal)
+
+	toChild, err := node.GetChildNode("nullTimeOnly")
+	require.NoError(t, err)
+	toVal, err := toChild.GetTimeOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, toVal)
+
+	doChild, err := node.GetChildNode("nullDateOnly")
+	require.NoError(t, err)
+	doVal, err := doChild.GetDateOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, doVal)
+
+	uuidChild, err := node.GetChildNode("nullUUID")
+	require.NoError(t, err)
+	uuidVal, err := uuidChild.GetUUIDValue()
+	require.NoError(t, err)
+	assert.Nil(t, uuidVal)
+
+	bytesChild, err := node.GetChildNode("nullBytes")
+	require.NoError(t, err)
+	bytesVal, err := bytesChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, bytesVal)
+}
