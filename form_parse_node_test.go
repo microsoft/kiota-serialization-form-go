@@ -1165,3 +1165,82 @@ func TestFormParseNode_NullMarkerCaseInsensitiveAndCollections(t *testing.T) {
 	assert.Nil(t, parsed[1])
 	assert.Equal(t, int32(2), *parsed[2].(*int32))
 }
+
+func TestFormParseNode_Int8AndByteExponentAndBounds(t *testing.T) {
+	// Valid int8 exponents
+	node, err := NewFormParseNode([]byte("pos=1e2&neg=-1e2&max=127&min=-128"))
+	require.NoError(t, err)
+
+	posNode, err := node.GetChildNode("pos")
+	require.NoError(t, err)
+	posVal, err := posNode.GetInt8Value()
+	require.NoError(t, err)
+	require.NotNil(t, posVal)
+	assert.Equal(t, int8(100), *posVal)
+
+	negNode, err := node.GetChildNode("neg")
+	require.NoError(t, err)
+	negVal, err := negNode.GetInt8Value()
+	require.NoError(t, err)
+	require.NotNil(t, negVal)
+	assert.Equal(t, int8(-100), *negVal)
+
+	// Int8 boundary overflow/underflow
+	overflowNode, err := NewFormParseNode([]byte("over=128&under=-129&large=1e3"))
+	require.NoError(t, err)
+
+	overNode, err := overflowNode.GetChildNode("over")
+	require.NoError(t, err)
+	_, err = overNode.GetInt8Value()
+	assert.Error(t, err)
+
+	underNode, err := overflowNode.GetChildNode("under")
+	require.NoError(t, err)
+	_, err = underNode.GetInt8Value()
+	assert.Error(t, err)
+
+	largeNode, err := overflowNode.GetChildNode("large")
+	require.NoError(t, err)
+	_, err = largeNode.GetInt8Value()
+	assert.Error(t, err)
+
+	// Valid byte exponents and boundary checks
+	byteNode, err := NewFormParseNode([]byte("bExp=1e2&bFloatExp=2.5e2&bMax=255&bOver=256&bNeg=-1&bLarge=1e3"))
+	require.NoError(t, err)
+
+	bExpChild, err := byteNode.GetChildNode("bExp")
+	require.NoError(t, err)
+	bExpVal, err := bExpChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bExpVal)
+	assert.Equal(t, byte(100), *bExpVal)
+
+	bFloatChild, err := byteNode.GetChildNode("bFloatExp")
+	require.NoError(t, err)
+	bFloatVal, err := bFloatChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bFloatVal)
+	assert.Equal(t, byte(250), *bFloatVal)
+
+	bMaxChild, err := byteNode.GetChildNode("bMax")
+	require.NoError(t, err)
+	bMaxVal, err := bMaxChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bMaxVal)
+	assert.Equal(t, byte(255), *bMaxVal)
+
+	bOverChild, err := byteNode.GetChildNode("bOver")
+	require.NoError(t, err)
+	_, err = bOverChild.GetByteValue()
+	assert.Error(t, err)
+
+	bNegChild, err := byteNode.GetChildNode("bNeg")
+	require.NoError(t, err)
+	_, err = bNegChild.GetByteValue()
+	assert.Error(t, err)
+
+	bLargeChild, err := byteNode.GetChildNode("bLarge")
+	require.NoError(t, err)
+	_, err = bLargeChild.GetByteValue()
+	assert.Error(t, err)
+}
