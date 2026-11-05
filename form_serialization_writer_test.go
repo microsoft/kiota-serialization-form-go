@@ -582,3 +582,228 @@ func TestWriteObjectValueWithNilElementsAndCallbacks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(content), "id=id-1")
 }
+
+func TestWriteAnyValue_TypedNilSafety(t *testing.T) {
+	serializer := NewFormSerializationWriter()
+
+	var pStr *string = nil
+	err := serializer.WriteAnyValue("nilStr", pStr)
+	assert.NoError(t, err)
+
+	var pInt *int32 = nil
+	err = serializer.WriteAnyValue("nilInt", pInt)
+	assert.NoError(t, err)
+
+	var pEntity *internal.TestEntity = nil
+	err = serializer.WriteAnyValue("nilEntity", pEntity)
+	assert.NoError(t, err)
+
+	var pSlice []string = nil
+	err = serializer.WriteAnyValue("nilSlice", pSlice)
+	assert.NoError(t, err)
+
+	var pMap map[string]string = nil
+	err = serializer.WriteAnyValue("nilMap", pMap)
+	assert.NoError(t, err)
+
+	err = serializer.WriteAnyValue("rawNil", nil)
+	assert.NoError(t, err)
+
+	// Non-nil value must return error as FormSerializationWriter doesn't support any-value serialization
+	err = serializer.WriteAnyValue("strVal", "not-nil")
+	assert.Error(t, err)
+
+	content, err := serializer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content)
+}
+
+func TestFormSerialization_WriteNullValueRoundTrip(t *testing.T) {
+	writer := NewFormSerializationWriter()
+
+	require.NoError(t, writer.WriteStringValue("normalStr", ref("hello")))
+	require.NoError(t, writer.WriteNullValue("nullBool"))
+	require.NoError(t, writer.WriteNullValue("nullInt8"))
+	require.NoError(t, writer.WriteNullValue("nullByte"))
+	require.NoError(t, writer.WriteNullValue("nullInt32"))
+	require.NoError(t, writer.WriteNullValue("nullInt64"))
+	require.NoError(t, writer.WriteNullValue("nullFloat32"))
+	require.NoError(t, writer.WriteNullValue("nullFloat64"))
+	require.NoError(t, writer.WriteNullValue("nullTime"))
+	require.NoError(t, writer.WriteNullValue("nullDuration"))
+	require.NoError(t, writer.WriteNullValue("nullTimeOnly"))
+	require.NoError(t, writer.WriteNullValue("nullDateOnly"))
+	require.NoError(t, writer.WriteNullValue("nullUUID"))
+	require.NoError(t, writer.WriteByteArrayValue("nilBytes", nil))
+	require.NoError(t, writer.WriteByteArrayValue("emptyBytes", []byte{}))
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.NotEmpty(t, content)
+
+	// Round-trip parse using FormParseNode
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	// Verify normal string parses correctly
+	normalChild, err := node.GetChildNode("normalStr")
+	require.NoError(t, err)
+	normalVal, err := normalChild.GetStringValue()
+	require.NoError(t, err)
+	require.NotNil(t, normalVal)
+	assert.Equal(t, "hello", *normalVal)
+
+	// Verify every typed primitive field parses to nil without syntax, range, or decode errors
+	boolChild, err := node.GetChildNode("nullBool")
+	require.NoError(t, err)
+	bVal, err := boolChild.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	i8Child, err := node.GetChildNode("nullInt8")
+	require.NoError(t, err)
+	i8Val, err := i8Child.GetInt8Value()
+	require.NoError(t, err)
+	assert.Nil(t, i8Val)
+
+	byteChild, err := node.GetChildNode("nullByte")
+	require.NoError(t, err)
+	byteVal, err := byteChild.GetByteValue()
+	require.NoError(t, err)
+	assert.Nil(t, byteVal)
+
+	i32Child, err := node.GetChildNode("nullInt32")
+	require.NoError(t, err)
+	i32Val, err := i32Child.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	i64Child, err := node.GetChildNode("nullInt64")
+	require.NoError(t, err)
+	i64Val, err := i64Child.GetInt64Value()
+	require.NoError(t, err)
+	assert.Nil(t, i64Val)
+
+	f32Child, err := node.GetChildNode("nullFloat32")
+	require.NoError(t, err)
+	f32Val, err := f32Child.GetFloat32Value()
+	require.NoError(t, err)
+	assert.Nil(t, f32Val)
+
+	f64Child, err := node.GetChildNode("nullFloat64")
+	require.NoError(t, err)
+	f64Val, err := f64Child.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Nil(t, f64Val)
+
+	timeChild, err := node.GetChildNode("nullTime")
+	require.NoError(t, err)
+	timeVal, err := timeChild.GetTimeValue()
+	require.NoError(t, err)
+	assert.Nil(t, timeVal)
+
+	durChild, err := node.GetChildNode("nullDuration")
+	require.NoError(t, err)
+	durVal, err := durChild.GetISODurationValue()
+	require.NoError(t, err)
+	assert.Nil(t, durVal)
+
+	toChild, err := node.GetChildNode("nullTimeOnly")
+	require.NoError(t, err)
+	toVal, err := toChild.GetTimeOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, toVal)
+
+	doChild, err := node.GetChildNode("nullDateOnly")
+	require.NoError(t, err)
+	doVal, err := doChild.GetDateOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, doVal)
+
+	uuidChild, err := node.GetChildNode("nullUUID")
+	require.NoError(t, err)
+	uuidVal, err := uuidChild.GetUUIDValue()
+	require.NoError(t, err)
+	assert.Nil(t, uuidVal)
+
+	nilBytesChild, err := node.GetChildNode("nilBytes")
+	require.NoError(t, err)
+	assert.Nil(t, nilBytesChild)
+
+	emptyBytesChild, err := node.GetChildNode("emptyBytes")
+	require.NoError(t, err)
+	require.NotNil(t, emptyBytesChild)
+	emptyBytesVal, err := emptyBytesChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, emptyBytesVal)
+}
+
+func TestFormSerialization_ByteArrayRoundTrip_Base64NullPayload(t *testing.T) {
+	writer := NewFormSerializationWriter()
+	payload := []byte{158, 233, 101}
+	err := writer.WriteByteArrayValue("data", payload)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "data=null", string(content))
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	child, err := node.GetChildNode("data")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	parsedBytes, err := child.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, payload, parsedBytes)
+}
+
+func TestFormSerialization_StringRoundTrip_LiteralNullPayloads(t *testing.T) {
+	for _, literal := range []string{"null", "NULL", " Null ", "nullify", "NULL_VALUE"} {
+		writer := NewFormSerializationWriter()
+		err := writer.WriteStringValue("str", ref(literal))
+		require.NoError(t, err)
+
+		content, err := writer.GetSerializedContent()
+		require.NoError(t, err)
+
+		node, err := NewFormParseNode(content)
+		require.NoError(t, err)
+
+		child, err := node.GetChildNode("str")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		val, err := child.GetStringValue()
+		require.NoError(t, err)
+		require.NotNil(t, val)
+		assert.Equal(t, literal, *val)
+	}
+
+	// String collections containing literal nulls
+	writer := NewFormSerializationWriter()
+	err := writer.WriteCollectionOfStringValues("items", []string{"null", "NULL", "hello"})
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	child, err := node.GetChildNode("items")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	parsed, err := child.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	require.Len(t, parsed, 3)
+	require.NotNil(t, parsed[0])
+	assert.Equal(t, "null", *parsed[0].(*string))
+	require.NotNil(t, parsed[1])
+	assert.Equal(t, "NULL", *parsed[1].(*string))
+	require.NotNil(t, parsed[2])
+	assert.Equal(t, "hello", *parsed[2].(*string))
+}

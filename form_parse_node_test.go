@@ -1049,3 +1049,319 @@ func TestFormParseNode_EncodedPositiveExponent(t *testing.T) {
 	assert.Equal(t, int32(100), *i32Coll[0].(*int32))
 	assert.Equal(t, int32(2000), *i32Coll[1].(*int32))
 }
+
+func TestFormParseNode_NullMarkerAcrossPrimitiveTypes(t *testing.T) {
+	// Form encoded query string with "null" values across various primitive fields
+	source := "bVal=null&i8Val=null&byteVal=null&i32Val=null&i64Val=null&f32Val=null&f64Val=null&tVal=null&durVal=null&toVal=null&doVal=null&uuidVal=null&bytesVal=&b64Bytes=null&enumVal=null"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	bNode, err := node.GetChildNode("bVal")
+	require.NoError(t, err)
+	bVal, err := bNode.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	i8Node, err := node.GetChildNode("i8Val")
+	require.NoError(t, err)
+	i8Val, err := i8Node.GetInt8Value()
+	require.NoError(t, err)
+	assert.Nil(t, i8Val)
+
+	byteNode, err := node.GetChildNode("byteVal")
+	require.NoError(t, err)
+	byteVal, err := byteNode.GetByteValue()
+	require.NoError(t, err)
+	assert.Nil(t, byteVal)
+
+	i32Node, err := node.GetChildNode("i32Val")
+	require.NoError(t, err)
+	i32Val, err := i32Node.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	i64Node, err := node.GetChildNode("i64Val")
+	require.NoError(t, err)
+	i64Val, err := i64Node.GetInt64Value()
+	require.NoError(t, err)
+	assert.Nil(t, i64Val)
+
+	f32Node, err := node.GetChildNode("f32Val")
+	require.NoError(t, err)
+	f32Val, err := f32Node.GetFloat32Value()
+	require.NoError(t, err)
+	assert.Nil(t, f32Val)
+
+	f64Node, err := node.GetChildNode("f64Val")
+	require.NoError(t, err)
+	f64Val, err := f64Node.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Nil(t, f64Val)
+
+	tNode, err := node.GetChildNode("tVal")
+	require.NoError(t, err)
+	tVal, err := tNode.GetTimeValue()
+	require.NoError(t, err)
+	assert.Nil(t, tVal)
+
+	durNode, err := node.GetChildNode("durVal")
+	require.NoError(t, err)
+	durVal, err := durNode.GetISODurationValue()
+	require.NoError(t, err)
+	assert.Nil(t, durVal)
+
+	toNode, err := node.GetChildNode("toVal")
+	require.NoError(t, err)
+	toVal, err := toNode.GetTimeOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, toVal)
+
+	doNode, err := node.GetChildNode("doVal")
+	require.NoError(t, err)
+	doVal, err := doNode.GetDateOnlyValue()
+	require.NoError(t, err)
+	assert.Nil(t, doVal)
+
+	uuidNode, err := node.GetChildNode("uuidVal")
+	require.NoError(t, err)
+	uuidVal, err := uuidNode.GetUUIDValue()
+	require.NoError(t, err)
+	assert.Nil(t, uuidVal)
+
+	bytesNode, err := node.GetChildNode("bytesVal")
+	require.NoError(t, err)
+	bytesVal, err := bytesNode.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Nil(t, bytesVal)
+
+	b64BytesNode, err := node.GetChildNode("b64Bytes")
+	require.NoError(t, err)
+	b64BytesVal, err := b64BytesNode.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{158, 233, 101}, b64BytesVal)
+
+	enumNode, err := node.GetChildNode("enumVal")
+	require.NoError(t, err)
+	enumVal, err := enumNode.GetEnumValue(testColorFactory)
+	require.NoError(t, err)
+	assert.Nil(t, enumVal)
+}
+
+func TestFormParseNode_NullMarkerCaseInsensitiveAndCollections(t *testing.T) {
+	source := "upper=NULL&coll=1,null,2"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	upperNode, err := node.GetChildNode("upper")
+	require.NoError(t, err)
+	i32Val, err := upperNode.GetInt32Value()
+	require.NoError(t, err)
+	assert.Nil(t, i32Val)
+
+	bVal, err := upperNode.GetBoolValue()
+	require.NoError(t, err)
+	assert.Nil(t, bVal)
+
+	collNode, err := node.GetChildNode("coll")
+	require.NoError(t, err)
+	parsed, err := collNode.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, parsed, 3)
+	assert.Equal(t, int32(1), *parsed[0].(*int32))
+	assert.Nil(t, parsed[1])
+	assert.True(t, parsed[1] == nil)
+	assert.Equal(t, int32(2), *parsed[2].(*int32))
+}
+
+func TestFormParseNode_Int8AndByteExponentAndBounds(t *testing.T) {
+	// Valid int8 exponents
+	node, err := NewFormParseNode([]byte("pos=1e2&neg=-1e2&max=127&min=-128"))
+	require.NoError(t, err)
+
+	posNode, err := node.GetChildNode("pos")
+	require.NoError(t, err)
+	posVal, err := posNode.GetInt8Value()
+	require.NoError(t, err)
+	require.NotNil(t, posVal)
+	assert.Equal(t, int8(100), *posVal)
+
+	negNode, err := node.GetChildNode("neg")
+	require.NoError(t, err)
+	negVal, err := negNode.GetInt8Value()
+	require.NoError(t, err)
+	require.NotNil(t, negVal)
+	assert.Equal(t, int8(-100), *negVal)
+
+	// Int8 boundary overflow/underflow
+	overflowNode, err := NewFormParseNode([]byte("over=128&under=-129&large=1e3"))
+	require.NoError(t, err)
+
+	overNode, err := overflowNode.GetChildNode("over")
+	require.NoError(t, err)
+	_, err = overNode.GetInt8Value()
+	assert.Error(t, err)
+
+	underNode, err := overflowNode.GetChildNode("under")
+	require.NoError(t, err)
+	_, err = underNode.GetInt8Value()
+	assert.Error(t, err)
+
+	largeNode, err := overflowNode.GetChildNode("large")
+	require.NoError(t, err)
+	_, err = largeNode.GetInt8Value()
+	assert.Error(t, err)
+
+	// Valid byte exponents and boundary checks
+	byteNode, err := NewFormParseNode([]byte("bExp=1e2&bFloatExp=2.5e2&bMax=255&bOver=256&bNeg=-1&bLarge=1e3"))
+	require.NoError(t, err)
+
+	bExpChild, err := byteNode.GetChildNode("bExp")
+	require.NoError(t, err)
+	bExpVal, err := bExpChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bExpVal)
+	assert.Equal(t, byte(100), *bExpVal)
+
+	bFloatChild, err := byteNode.GetChildNode("bFloatExp")
+	require.NoError(t, err)
+	bFloatVal, err := bFloatChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bFloatVal)
+	assert.Equal(t, byte(250), *bFloatVal)
+
+	bMaxChild, err := byteNode.GetChildNode("bMax")
+	require.NoError(t, err)
+	bMaxVal, err := bMaxChild.GetByteValue()
+	require.NoError(t, err)
+	require.NotNil(t, bMaxVal)
+	assert.Equal(t, byte(255), *bMaxVal)
+
+	bOverChild, err := byteNode.GetChildNode("bOver")
+	require.NoError(t, err)
+	_, err = bOverChild.GetByteValue()
+	assert.Error(t, err)
+
+	bNegChild, err := byteNode.GetChildNode("bNeg")
+	require.NoError(t, err)
+	_, err = bNegChild.GetByteValue()
+	assert.Error(t, err)
+
+	bLargeChild, err := byteNode.GetChildNode("bLarge")
+	require.NoError(t, err)
+	_, err = bLargeChild.GetByteValue()
+	assert.Error(t, err)
+}
+
+func TestFormParseNode_PrimitiveCollectionSchemaAliases(t *testing.T) {
+	source := "bools=true,false&doubles=1.5,2.5&floats=3.5,4.5&ints=10,20&bins=AQID,BAUG&durs=PT1H,PT2M&times=2022-01-01T00:00:00Z,2022-01-02T00:00:00Z"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	boolsChild, err := node.GetChildNode("bools")
+	require.NoError(t, err)
+	bools, err := boolsChild.GetCollectionOfPrimitiveValues("boolean")
+	require.NoError(t, err)
+	require.Len(t, bools, 2)
+	assert.True(t, *bools[0].(*bool))
+	assert.False(t, *bools[1].(*bool))
+
+	doublesChild, err := node.GetChildNode("doubles")
+	require.NoError(t, err)
+	doubles, err := doublesChild.GetCollectionOfPrimitiveValues("double")
+	require.NoError(t, err)
+	require.Len(t, doubles, 2)
+	assert.Equal(t, 1.5, *doubles[0].(*float64))
+	assert.Equal(t, 2.5, *doubles[1].(*float64))
+
+	floatsChild, err := node.GetChildNode("floats")
+	require.NoError(t, err)
+	floats, err := floatsChild.GetCollectionOfPrimitiveValues("float")
+	require.NoError(t, err)
+	require.Len(t, floats, 2)
+	assert.Equal(t, float32(3.5), *floats[0].(*float32))
+	assert.Equal(t, float32(4.5), *floats[1].(*float32))
+
+	intsChild, err := node.GetChildNode("ints")
+	require.NoError(t, err)
+	ints, err := intsChild.GetCollectionOfPrimitiveValues("integer")
+	require.NoError(t, err)
+	require.Len(t, ints, 2)
+	assert.Equal(t, int64(10), *ints[0].(*int64))
+	assert.Equal(t, int64(20), *ints[1].(*int64))
+
+	binsChild, err := node.GetChildNode("bins")
+	require.NoError(t, err)
+	bins, err := binsChild.GetCollectionOfPrimitiveValues("binary")
+	require.NoError(t, err)
+	require.Len(t, bins, 2)
+	assert.Equal(t, []byte{1, 2, 3}, bins[0].([]byte))
+	assert.Equal(t, []byte{4, 5, 6}, bins[1].([]byte))
+
+	dursChild, err := node.GetChildNode("durs")
+	require.NoError(t, err)
+	durs, err := dursChild.GetCollectionOfPrimitiveValues("duration")
+	require.NoError(t, err)
+	require.Len(t, durs, 2)
+
+	timesChild, err := node.GetChildNode("times")
+	require.NoError(t, err)
+	timesDt, err := timesChild.GetCollectionOfPrimitiveValues("datetime")
+	require.NoError(t, err)
+	require.Len(t, timesDt, 2)
+
+	timesDash, err := timesChild.GetCollectionOfPrimitiveValues("date-time")
+	require.NoError(t, err)
+	require.Len(t, timesDash, 2)
+}
+
+func TestFormParseNode_ByteArrayValidBase64CasePayloads(t *testing.T) {
+	node, err := NewFormParseNode([]byte("upper=NULL&mixed=Null&lower=null"))
+	require.NoError(t, err)
+
+	upperChild, err := node.GetChildNode("upper")
+	require.NoError(t, err)
+	upperBytes, err := upperChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{53, 66, 203}, upperBytes)
+
+	mixedChild, err := node.GetChildNode("mixed")
+	require.NoError(t, err)
+	mixedBytes, err := mixedChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{54, 233, 101}, mixedBytes)
+
+	lowerChild, err := node.GetChildNode("lower")
+	require.NoError(t, err)
+	lowerBytes, err := lowerChild.GetByteArrayValue()
+	require.NoError(t, err)
+	assert.Equal(t, []byte{158, 233, 101}, lowerBytes)
+}
+
+func TestFormParseNode_GetEnumValue_PreservesWhitespace(t *testing.T) {
+	received := ""
+	customFactory := func(val string) (interface{}, error) {
+		received = val
+		return val, nil
+	}
+
+	node, err := NewFormParseNode([]byte("status=%20ready%20"))
+	require.NoError(t, err)
+	child, err := node.GetChildNode("status")
+	require.NoError(t, err)
+
+	val, err := child.GetEnumValue(customFactory)
+	require.NoError(t, err)
+	assert.Equal(t, " ready ", val)
+	assert.Equal(t, " ready ", received)
+
+	// Ensure null enum still returns (nil, nil)
+	nullNode, err := NewFormParseNode([]byte("status=null"))
+	require.NoError(t, err)
+	nullChild, err := nullNode.GetChildNode("status")
+	require.NoError(t, err)
+
+	nullVal, err := nullChild.GetEnumValue(customFactory)
+	require.NoError(t, err)
+	assert.Nil(t, nullVal)
+}
+

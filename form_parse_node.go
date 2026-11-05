@@ -178,7 +178,11 @@ func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]int
 		if err != nil {
 			return nil, err
 		}
-		result[i] = val
+		if isNil(val) {
+			result[i] = nil
+		} else {
+			result[i] = val
+		}
 	}
 	return result, nil
 }
@@ -187,31 +191,31 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 	switch strings.ToLower(strings.TrimSpace(targetType)) {
 	case "string":
 		return getStringValue(value)
-	case "bool":
+	case "bool", "boolean":
 		return getBoolValue(value)
 	case "int8", "uint8":
 		return getInt8Value(value)
 	case "byte":
 		return getByteValue(value)
-	case "float32":
+	case "float32", "float":
 		return getFloat32Value(value)
-	case "float64":
+	case "float64", "double":
 		return getFloat64Value(value)
 	case "int32":
 		return getInt32Value(value)
-	case "int64", "int":
+	case "int64", "int", "integer":
 		return getInt64Value(value)
-	case "time":
+	case "time", "datetime", "date-time":
 		return getTimeValue(value)
 	case "timeonly":
 		return getTimeOnlyValue(value)
 	case "dateonly":
 		return getDateOnlyValue(value)
-	case "isoduration":
+	case "isoduration", "duration":
 		return getISODurationValue(value)
 	case "uuid":
 		return getUUIDValue(value)
-	case "base64", "[]byte", "bytearray":
+	case "base64", "[]byte", "bytearray", "binary":
 		return getByteArrayValue(value)
 	default:
 		return nil, errors.New("targetType is not supported")
@@ -236,7 +240,11 @@ func (n *FormParseNode) GetCollectionOfEnumValues(parser absser.EnumFactory) ([]
 		if err != nil {
 			return nil, err
 		}
-		result[i] = val
+		if isNil(val) {
+			result[i] = nil
+		} else {
+			result[i] = val
+		}
 	}
 	return result, nil
 }
@@ -249,12 +257,28 @@ func (n *FormParseNode) GetStringValue() (*string, error) {
 	return getStringValue(n.value)
 }
 
+func isNullValue(value string) bool {
+	return strings.EqualFold(strings.TrimSpace(value), "null")
+}
+
 func getStringValue(value string) (*string, error) {
 	res, err := url.QueryUnescape(value)
 	if err != nil {
 		return nil, err
 	}
 	return &res, nil
+}
+
+func getTrimmedValue(value string) (*string, error) {
+	v, err := getStringValue(value)
+	if err != nil || v == nil {
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" || isNullValue(trimmed) {
+		return nil, nil
+	}
+	return &trimmed, nil
 }
 
 // GetBoolValue returns a Bool value from the nodes.
@@ -266,18 +290,11 @@ func (n *FormParseNode) GetBoolValue() (*bool, error) {
 }
 
 func getBoolValue(value string) (*bool, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	res, err := strconv.ParseBool(trimmed)
+	res, err := strconv.ParseBool(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -293,22 +310,18 @@ func (n *FormParseNode) GetInt8Value() (*int8, error) {
 }
 
 func getInt8Value(value string) (*int8, error) {
-	v, err := getStringValue(value)
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
+		return nil, err
+	}
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
+	if val > math.MaxInt8 || val < math.MinInt8 {
+		return nil, &strconv.NumError{Func: "ParseInt", Num: value, Err: strconv.ErrRange}
 	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	res, err := strconv.ParseInt(trimmed, 10, 8)
-	if err != nil {
-		return nil, err
-	}
-	cast := int8(res)
+	cast := int8(val)
 	return &cast, nil
 }
 
@@ -321,22 +334,18 @@ func (n *FormParseNode) GetByteValue() (*byte, error) {
 }
 
 func getByteValue(value string) (*byte, error) {
-	v, err := getStringValue(value)
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
+		return nil, err
+	}
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
+	if val > math.MaxUint8 || val < 0 {
+		return nil, &strconv.NumError{Func: "ParseUint", Num: value, Err: strconv.ErrRange}
 	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	res, err := strconv.ParseUint(trimmed, 10, 8)
-	if err != nil {
-		return nil, err
-	}
-	cast := byte(res)
+	cast := byte(val)
 	return &cast, nil
 }
 
@@ -350,11 +359,8 @@ func (n *FormParseNode) GetFloat32Value() (*float32, error) {
 
 func getFloat32Value(value string) (*float32, error) {
 	v, err := getFloat64Value(value)
-	if err != nil {
+	if err != nil || v == nil {
 		return nil, err
-	}
-	if v == nil {
-		return nil, nil
 	}
 	cast := float32(*v)
 	return &cast, nil
@@ -369,18 +375,11 @@ func (n *FormParseNode) GetFloat64Value() (*float64, error) {
 }
 
 func getFloat64Value(value string) (*float64, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	res, err := strconv.ParseFloat(trimmed, 64)
+	res, err := strconv.ParseFloat(*v, 64)
 	if err != nil {
 		return nil, err
 	}
@@ -420,18 +419,11 @@ func parseNumberAsInt64(value string) (int64, error) {
 }
 
 func getInt32Value(value string) (*int32, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -451,18 +443,11 @@ func (n *FormParseNode) GetInt64Value() (*int64, error) {
 }
 
 func getInt64Value(value string) (*int64, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	val, err := parseNumberAsInt64(trimmed)
+	val, err := parseNumberAsInt64(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -478,20 +463,13 @@ func (n *FormParseNode) GetTimeValue() (*time.Time, error) {
 }
 
 func getTimeValue(value string) (*time.Time, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	parsed, err := time.Parse(time.RFC3339, trimmed)
+	parsed, err := time.Parse(time.RFC3339, *v)
 	if err != nil {
-		parsed, err = time.Parse(time.RFC3339Nano, trimmed)
+		parsed, err = time.Parse(time.RFC3339Nano, *v)
 		if err != nil {
 			return nil, err
 		}
@@ -508,18 +486,11 @@ func (n *FormParseNode) GetISODurationValue() (*absser.ISODuration, error) {
 }
 
 func getISODurationValue(value string) (*absser.ISODuration, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	return absser.ParseISODuration(trimmed)
+	return absser.ParseISODuration(*v)
 }
 
 // GetTimeOnlyValue returns a TimeOnly value from the nodes.
@@ -531,18 +502,11 @@ func (n *FormParseNode) GetTimeOnlyValue() (*absser.TimeOnly, error) {
 }
 
 func getTimeOnlyValue(value string) (*absser.TimeOnly, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	return absser.ParseTimeOnly(trimmed)
+	return absser.ParseTimeOnly(*v)
 }
 
 // GetDateOnlyValue returns a DateOnly value from the nodes.
@@ -554,18 +518,11 @@ func (n *FormParseNode) GetDateOnlyValue() (*absser.DateOnly, error) {
 }
 
 func getDateOnlyValue(value string) (*absser.DateOnly, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	return absser.ParseDateOnly(trimmed)
+	return absser.ParseDateOnly(*v)
 }
 
 // GetUUIDValue returns a UUID value from the nodes.
@@ -577,18 +534,11 @@ func (n *FormParseNode) GetUUIDValue() (*uuid.UUID, error) {
 }
 
 func getUUIDValue(value string) (*uuid.UUID, error) {
-	v, err := getStringValue(value)
-	if err != nil {
+	v, err := getTrimmedValue(value)
+	if err != nil || v == nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
-	if trimmed == "" {
-		return nil, nil
-	}
-	parsed, err := uuid.Parse(trimmed)
+	parsed, err := uuid.Parse(*v)
 	if err != nil {
 		return nil, err
 	}
@@ -601,10 +551,10 @@ func (n *FormParseNode) GetEnumValue(parser absser.EnumFactory) (interface{}, er
 		return nil, errors.New("parser is nil")
 	}
 	s, err := n.GetStringValue()
-	if err != nil {
+	if err != nil || s == nil {
 		return nil, err
 	}
-	if s == nil {
+	if isNullValue(*s) {
 		return nil, nil
 	}
 	return parser(*s)
@@ -619,14 +569,11 @@ func (n *FormParseNode) GetByteArrayValue() ([]byte, error) {
 }
 
 func getByteArrayValue(value string) ([]byte, error) {
-	v, err := getStringValue(value)
+	res, err := url.QueryUnescape(value)
 	if err != nil {
 		return nil, err
 	}
-	if v == nil {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(*v)
+	trimmed := strings.TrimSpace(res)
 	if trimmed == "" {
 		return nil, nil
 	}
