@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.7](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.6...v1.1.7) (2026-11-06)
+
+
+### Bug Fixes
+
+* **form:** add nil receiver guards to FormSerializationWriter and support case-insensitive primitive target types ([7eea46f](https://github.com/microsoft/kiota-serialization-form-go/commit/7eea46fb2077ade65495729a758e45b055bb781a))
+* **form:** add nil receiver guards to FormSerializationWriter and support case-insensitive primitive target types ([80a6052](https://github.com/microsoft/kiota-serialization-form-go/commit/80a605215f25e798274f1cbffa4ef9a7701b4aac))
+* **form:** expand primitive collection target types for schema aliases and add typed nil guard in WriteAnyValue ([ffa9f8e](https://github.com/microsoft/kiota-serialization-form-go/commit/ffa9f8e97d29b937cbccc598dcb57444d2c23c5d))
+* **form:** guard nil objects in WriteObjectValue and expand primitive parsing ([149b21c](https://github.com/microsoft/kiota-serialization-form-go/commit/149b21ce23a44352bfdfb28b260ade8202a52709))
+* **form:** guard nil objects in WriteObjectValue and expand primitive parsing support ([41694bf](https://github.com/microsoft/kiota-serialization-form-go/commit/41694bf6cc9e1d5d910306f0206ace3d58644941))
+* **form:** handle null marker in numeric, boolean, temporal, uuid, and bytearray parsers ([b2d538f](https://github.com/microsoft/kiota-serialization-form-go/commit/b2d538f51e6e896815c979cbed7d07e06b0f4501))
+* **form:** manage writer depth lifecycle, handle additional data errors, and preserve collection elements ([f7c7eef](https://github.com/microsoft/kiota-serialization-form-go/commit/f7c7eeff8cdf5f93ffae12f5724b70faf64492dd))
+* **form:** manage writer depth lifecycle, handle serialize error, and propagate additional data errors ([78d8f0b](https://github.com/microsoft/kiota-serialization-form-go/commit/78d8f0bb6143d4addd926d86d79630759a84d407))
+* **form:** preserve base64 payloads in byte parser and unbox nil primitive collection interfaces ([748c9e0](https://github.com/microsoft/kiota-serialization-form-go/commit/748c9e02cf6d08842f1d30cfaafb5e3c578e74e4))
+* **form:** preserve empty child parse nodes and handle nil writer values ([87dbbab](https://github.com/microsoft/kiota-serialization-form-go/commit/87dbbab9bfacf1cbde480cb5f84315c90aeac1e1))
+* **form:** preserve empty child parse nodes and handle nil writer values ([c6a05e5](https://github.com/microsoft/kiota-serialization-form-go/commit/c6a05e57df50b6ee7ca463b494d53d8e26435981))
+* **form:** preserve empty collection elements in loadFields and sanitize uuid parsing ([8d4cc72](https://github.com/microsoft/kiota-serialization-form-go/commit/8d4cc72f81ad80f1c5466916b2240208c4d3461a))
+* **form:** preserve literal null strings and retain whitespace in enum parsing ([f33816a](https://github.com/microsoft/kiota-serialization-form-go/commit/f33816a812644a5faf732a7a7db5a961b05f6571))
+* **form:** reject typed-nil parsables in WriteObjectValue and avoid double URL decoding in integer parsing ([5fd90f2](https://github.com/microsoft/kiota-serialization-form-go/commit/5fd90f2779bab79e776ea2030a80891be2ba628d))
+* **form:** support exponent notation and range validation in getInt8Value and getByteValue ([53ca681](https://github.com/microsoft/kiota-serialization-form-go/commit/53ca6816b6c51e7567b9f70143f721364869f4fd))
+* **form:** support null markers, exponent tokens, schema aliases, and typed-nil WriteAnyValue ([2197ab6](https://github.com/microsoft/kiota-serialization-form-go/commit/2197ab674907ae69f5e2a1ab9a3bf7f4901350dc))
+
 ## [1.1.6](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.5...v1.1.6) (2026-10-27)
 
 
