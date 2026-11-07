@@ -1365,3 +1365,50 @@ func TestFormParseNode_GetEnumValue_PreservesWhitespace(t *testing.T) {
 	assert.Nil(t, nullVal)
 }
 
+func TestFormParseNode_GetObjectValue_NullAndWhitespace(t *testing.T) {
+	// Root null node
+	rootNull, err := NewFormParseNode([]byte("null"))
+	require.NoError(t, err)
+	obj, err := rootNull.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Root case-insensitive null node
+	rootUpperNull, err := NewFormParseNode([]byte("NULL"))
+	require.NoError(t, err)
+	obj, err = rootUpperNull.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Root whitespace node
+	rootWhitespace, err := NewFormParseNode([]byte("   "))
+	require.NoError(t, err)
+	obj, err = rootWhitespace.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Child null node
+	payload := "entity=null&upperEntity=NULL&wsEntity=%20%20"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	childEntity, err := node.GetChildNode("entity")
+	require.NoError(t, err)
+	obj, err = childEntity.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childUpper, err := node.GetChildNode("upperEntity")
+	require.NoError(t, err)
+	obj, err = childUpper.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childWs, err := node.GetChildNode("wsEntity")
+	require.NoError(t, err)
+	obj, err = childWs.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+}
+
+
