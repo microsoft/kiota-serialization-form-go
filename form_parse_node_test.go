@@ -1411,4 +1411,66 @@ func TestFormParseNode_GetObjectValue_NullAndWhitespace(t *testing.T) {
 	assert.Nil(t, obj)
 }
 
+func TestFormParseNode_CollectionGetters_NullAndWhitespace(t *testing.T) {
+	dummyParser := func(val string) (interface{}, error) {
+		return val, nil
+	}
+
+	// Root null nodes return (nil, nil)
+	rootNull, err := NewFormParseNode([]byte("null"))
+	require.NoError(t, err)
+	primColl, err := rootNull.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	enumColl, err := rootNull.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	// Root whitespace nodes return (nil, nil)
+	rootWs, err := NewFormParseNode([]byte("   "))
+	require.NoError(t, err)
+	primColl, err = rootWs.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	enumColl, err = rootWs.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	// Child null collections return (nil, nil)
+	payload := "numbers=null&upperRoles=NULL&wsItems=%20%20&mixed=10,null,20"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	numChild, err := node.GetChildNode("numbers")
+	require.NoError(t, err)
+	primColl, err = numChild.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	rolesChild, err := node.GetChildNode("upperRoles")
+	require.NoError(t, err)
+	enumColl, err = rolesChild.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	wsChild, err := node.GetChildNode("wsItems")
+	require.NoError(t, err)
+	primColl, err = wsChild.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	// Mixed collections still preserve non-null elements
+	mixedChild, err := node.GetChildNode("mixed")
+	require.NoError(t, err)
+	mixedColl, err := mixedChild.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, mixedColl, 3)
+	assert.Equal(t, int32(10), *mixedColl[0].(*int32))
+	assert.Nil(t, mixedColl[1])
+	assert.Equal(t, int32(20), *mixedColl[2].(*int32))
+}
+
+
 
