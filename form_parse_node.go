@@ -163,7 +163,7 @@ func (n *FormParseNode) GetCollectionOfObjectValues(ctor absser.ParsableFactory)
 
 // GetCollectionOfPrimitiveValues returns the collection of primitive values from the node.
 func (n *FormParseNode) GetCollectionOfPrimitiveValues(targetType string) ([]interface{}, error) {
-	if n == nil || n.value == "" {
+	if n == nil || isNullOrEmptyNode(n.value) {
 		return nil, nil
 	}
 	trimmedType := strings.TrimSpace(targetType)
@@ -224,7 +224,7 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 
 // GetCollectionOfEnumValues returns the collection of Enum values from the node.
 func (n *FormParseNode) GetCollectionOfEnumValues(parser absser.EnumFactory) ([]interface{}, error) {
-	if n == nil || n.value == "" {
+	if n == nil || isNullOrEmptyNode(n.value) {
 		return nil, nil
 	}
 	if parser == nil {
