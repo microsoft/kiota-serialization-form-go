@@ -105,7 +105,7 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 	if ctor == nil {
 		return nil, errors.New("constructor is nil")
 	}
-	if n == nil || n.value == "" {
+	if n == nil || isNullOrEmptyNode(n.value) {
 		return nil, nil
 	}
 	result, err := ctor(n)
@@ -255,6 +255,15 @@ func (n *FormParseNode) GetStringValue() (*string, error) {
 		return nil, nil
 	}
 	return getStringValue(n.value)
+}
+
+func isNullOrEmptyNode(value string) bool {
+	res, err := url.QueryUnescape(value)
+	if err != nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(res)
+	return trimmed == "" || isNullValue(trimmed)
 }
 
 func isNullValue(value string) bool {
