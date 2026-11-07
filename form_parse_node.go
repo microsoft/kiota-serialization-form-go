@@ -155,7 +155,7 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 
 // GetCollectionOfObjectValues returns the collection of Parsable values from the node.
 func (n *FormParseNode) GetCollectionOfObjectValues(ctor absser.ParsableFactory) ([]absser.Parsable, error) {
-	if n == nil || n.value == "" {
+	if n == nil || isNullOrEmptyNode(n.value) {
 		return nil, nil
 	}
 	return nil, errors.New("collections are not supported in form serialization")
@@ -589,9 +589,9 @@ func getByteArrayValue(value string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(trimmed)
 }
 
-// GetRawValue returns a ByteArray value from the nodes.
+// GetRawValue returns a pointer to the raw string value from the node, or nil if the node is empty or null.
 func (n *FormParseNode) GetRawValue() (interface{}, error) {
-	if n == nil || n.value == "" {
+	if n == nil || isNullOrEmptyNode(n.value) {
 		return nil, nil
 	}
 	res := n.value
