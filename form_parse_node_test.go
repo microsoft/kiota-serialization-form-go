@@ -1546,6 +1546,41 @@ func TestFormParseNode_CollectionOfObjectsAndRawValue_NullAndWhitespace(t *testi
 	assert.Contains(t, err.Error(), "collections are not supported in form serialization")
 }
 
+func TestFormParseNode_KeySanitizationAndIndexValidation(t *testing.T) {
+	node, err := NewFormParseNode([]byte("user=alice"))
+	require.NoError(t, err)
 
+	// Whitespace-only indices must return index is empty error
+	for _, wsIndex := range []string{"", " ", "   ", "\t", "\r\n"} {
+		child, err := node.GetChildNode(wsIndex)
+		assert.Nil(t, child)
+		assert.EqualError(t, err, "index is empty")
+	}
 
+	// Keys with tabs, newlines, and spaces must be properly trimmed during field loading
+	whitespaceKeyPayload := "%09user%09=alice&%0D%0Arole%0D%0A=admin&%20tag%20=golang"
+	wsNode, err := NewFormParseNode([]byte(whitespaceKeyPayload))
+	require.NoError(t, err)
+
+	userChild, err := wsNode.GetChildNode("user")
+	require.NoError(t, err)
+	require.NotNil(t, userChild)
+	userVal, err := userChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "alice", *userVal)
+
+	roleChild, err := wsNode.GetChildNode("role")
+	require.NoError(t, err)
+	require.NotNil(t, roleChild)
+	roleVal, err := roleChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "admin", *roleVal)
+
+	tagChild, err := wsNode.GetChildNode("tag")
+	require.NoError(t, err)
+	require.NotNil(t, tagChild)
+	tagVal, err := tagChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "golang", *tagVal)
+}
 
