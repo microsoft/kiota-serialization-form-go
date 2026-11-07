@@ -1365,3 +1365,222 @@ func TestFormParseNode_GetEnumValue_PreservesWhitespace(t *testing.T) {
 	assert.Nil(t, nullVal)
 }
 
+func TestFormParseNode_GetObjectValue_NullAndWhitespace(t *testing.T) {
+	// Root null node
+	rootNull, err := NewFormParseNode([]byte("null"))
+	require.NoError(t, err)
+	obj, err := rootNull.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Root case-insensitive null node
+	rootUpperNull, err := NewFormParseNode([]byte("NULL"))
+	require.NoError(t, err)
+	obj, err = rootUpperNull.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Root whitespace node
+	rootWhitespace, err := NewFormParseNode([]byte("   "))
+	require.NoError(t, err)
+	obj, err = rootWhitespace.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	// Child null node
+	payload := "entity=null&upperEntity=NULL&wsEntity=%20%20"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	childEntity, err := node.GetChildNode("entity")
+	require.NoError(t, err)
+	obj, err = childEntity.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childUpper, err := node.GetChildNode("upperEntity")
+	require.NoError(t, err)
+	obj, err = childUpper.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childWs, err := node.GetChildNode("wsEntity")
+	require.NoError(t, err)
+	obj, err = childWs.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+}
+
+func TestFormParseNode_CollectionGetters_NullAndWhitespace(t *testing.T) {
+	dummyParser := func(val string) (interface{}, error) {
+		return val, nil
+	}
+
+	// Root null nodes return (nil, nil)
+	rootNull, err := NewFormParseNode([]byte("null"))
+	require.NoError(t, err)
+	primColl, err := rootNull.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	enumColl, err := rootNull.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	// Root whitespace nodes return (nil, nil)
+	rootWs, err := NewFormParseNode([]byte("   "))
+	require.NoError(t, err)
+	primColl, err = rootWs.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	enumColl, err = rootWs.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	// Child null collections return (nil, nil)
+	payload := "numbers=null&upperRoles=NULL&wsItems=%20%20&mixed=10,null,20"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	numChild, err := node.GetChildNode("numbers")
+	require.NoError(t, err)
+	primColl, err = numChild.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	rolesChild, err := node.GetChildNode("upperRoles")
+	require.NoError(t, err)
+	enumColl, err = rolesChild.GetCollectionOfEnumValues(dummyParser)
+	require.NoError(t, err)
+	assert.Nil(t, enumColl)
+
+	wsChild, err := node.GetChildNode("wsItems")
+	require.NoError(t, err)
+	primColl, err = wsChild.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Nil(t, primColl)
+
+	// Mixed collections still preserve non-null elements
+	mixedChild, err := node.GetChildNode("mixed")
+	require.NoError(t, err)
+	mixedColl, err := mixedChild.GetCollectionOfPrimitiveValues("int32")
+	require.NoError(t, err)
+	require.Len(t, mixedColl, 3)
+	assert.Equal(t, int32(10), *mixedColl[0].(*int32))
+	assert.Nil(t, mixedColl[1])
+	assert.Equal(t, int32(20), *mixedColl[2].(*int32))
+}
+
+func TestFormParseNode_CollectionOfObjectsAndRawValue_NullAndWhitespace(t *testing.T) {
+	// Root null node for object collections
+	rootNull, err := NewFormParseNode([]byte("null"))
+	require.NoError(t, err)
+	objColl, err := rootNull.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, objColl)
+
+	rawVal, err := rootNull.GetRawValue()
+	require.NoError(t, err)
+	assert.Nil(t, rawVal)
+
+	// Root case-insensitive null node
+	rootUpper, err := NewFormParseNode([]byte("NULL"))
+	require.NoError(t, err)
+	objColl, err = rootUpper.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, objColl)
+
+	rawVal, err = rootUpper.GetRawValue()
+	require.NoError(t, err)
+	assert.Nil(t, rawVal)
+
+	// Root whitespace node
+	rootWs, err := NewFormParseNode([]byte("   "))
+	require.NoError(t, err)
+	objColl, err = rootWs.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, objColl)
+
+	rawVal, err = rootWs.GetRawValue()
+	require.NoError(t, err)
+	assert.Nil(t, rawVal)
+
+	// Child nodes
+	payload := "users=null&upperUsers=NULL&wsNode=%20%20&activeUser=john"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	nullUsers, err := node.GetChildNode("users")
+	require.NoError(t, err)
+	objColl, err = nullUsers.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, objColl)
+
+	rawVal, err = nullUsers.GetRawValue()
+	require.NoError(t, err)
+	assert.Nil(t, rawVal)
+
+	upperUsers, err := node.GetChildNode("upperUsers")
+	require.NoError(t, err)
+	objColl, err = upperUsers.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, objColl)
+
+	wsChild, err := node.GetChildNode("wsNode")
+	require.NoError(t, err)
+	rawVal, err = wsChild.GetRawValue()
+	require.NoError(t, err)
+	assert.Nil(t, rawVal)
+
+	// Non-null non-empty node returns raw value and rejects collection of objects
+	activeUser, err := node.GetChildNode("activeUser")
+	require.NoError(t, err)
+	rawVal, err = activeUser.GetRawValue()
+	require.NoError(t, err)
+	require.NotNil(t, rawVal)
+	assert.Equal(t, "john", *rawVal.(*string))
+
+	_, err = activeUser.GetCollectionOfObjectValues(internal.CreateTestEntityFromDiscriminator)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "collections are not supported in form serialization")
+}
+
+func TestFormParseNode_KeySanitizationAndIndexValidation(t *testing.T) {
+	node, err := NewFormParseNode([]byte("user=alice"))
+	require.NoError(t, err)
+
+	// Whitespace-only indices must return index is empty error
+	for _, wsIndex := range []string{"", " ", "   ", "\t", "\r\n"} {
+		child, err := node.GetChildNode(wsIndex)
+		assert.Nil(t, child)
+		assert.EqualError(t, err, "index is empty")
+	}
+
+	// Keys with tabs, newlines, and spaces must be properly trimmed during field loading
+	whitespaceKeyPayload := "%09user%09=alice&%0D%0Arole%0D%0A=admin&%20tag%20=golang"
+	wsNode, err := NewFormParseNode([]byte(whitespaceKeyPayload))
+	require.NoError(t, err)
+
+	userChild, err := wsNode.GetChildNode("user")
+	require.NoError(t, err)
+	require.NotNil(t, userChild)
+	userVal, err := userChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "alice", *userVal)
+
+	roleChild, err := wsNode.GetChildNode("role")
+	require.NoError(t, err)
+	require.NotNil(t, roleChild)
+	roleVal, err := roleChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "admin", *roleVal)
+
+	tagChild, err := wsNode.GetChildNode("tag")
+	require.NoError(t, err)
+	require.NotNil(t, tagChild)
+	tagVal, err := tagChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "golang", *tagVal)
+}
+
