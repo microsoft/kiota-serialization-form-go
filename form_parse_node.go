@@ -72,7 +72,7 @@ func sanitizeKey(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.Trim(res, " "), nil
+	return strings.TrimSpace(res), nil
 }
 
 // GetChildNode returns a new parse node for the given identifier.
@@ -80,7 +80,7 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if n == nil {
 		return nil, errors.New("node is nil")
 	}
-	if index == "" {
+	if strings.TrimSpace(index) == "" {
 		return nil, errors.New("index is empty")
 	}
 	key, err := sanitizeKey(index)
