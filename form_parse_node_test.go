@@ -1388,7 +1388,7 @@ func TestFormParseNode_GetObjectValue_NullAndWhitespace(t *testing.T) {
 	assert.Nil(t, obj)
 
 	// Child null node
-	payload := "entity=null&upperEntity=NULL&wsEntity=%20%20"
+	payload := "entity=null&upperEntity=NULL&wsEntity=%20%20&encodedNull=%6e%75%6c%6c&plusWs=++"
 	node, err := NewFormParseNode([]byte(payload))
 	require.NoError(t, err)
 
@@ -1407,6 +1407,18 @@ func TestFormParseNode_GetObjectValue_NullAndWhitespace(t *testing.T) {
 	childWs, err := node.GetChildNode("wsEntity")
 	require.NoError(t, err)
 	obj, err = childWs.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childEncodedNull, err := node.GetChildNode("encodedNull")
+	require.NoError(t, err)
+	obj, err = childEncodedNull.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	assert.Nil(t, obj)
+
+	childPlusWs, err := node.GetChildNode("plusWs")
+	require.NoError(t, err)
+	obj, err = childPlusWs.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
 	require.NoError(t, err)
 	assert.Nil(t, obj)
 }
@@ -1550,8 +1562,8 @@ func TestFormParseNode_KeySanitizationAndIndexValidation(t *testing.T) {
 	node, err := NewFormParseNode([]byte("user=alice"))
 	require.NoError(t, err)
 
-	// Whitespace-only indices must return index is empty error
-	for _, wsIndex := range []string{"", " ", "   ", "\t", "\r\n"} {
+	// Whitespace-only and encoded whitespace indices must return index is empty error
+	for _, wsIndex := range []string{"", " ", "   ", "\t", "\r\n", "%20", "%09", "+", "%0D%0A", "  %20  ", "%20%20"} {
 		child, err := node.GetChildNode(wsIndex)
 		assert.Nil(t, child)
 		assert.EqualError(t, err, "index is empty")

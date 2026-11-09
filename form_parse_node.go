@@ -87,6 +87,9 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if err != nil {
 		return nil, err
 	}
+	if key == "" {
+		return nil, errors.New("index is empty")
+	}
 	fieldValue, ok := n.fields[key]
 	if !ok {
 		return nil, nil
@@ -258,11 +261,18 @@ func (n *FormParseNode) GetStringValue() (*string, error) {
 }
 
 func isNullOrEmptyNode(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || isNullValue(trimmed) {
+		return true
+	}
+	if !strings.ContainsAny(value, "%+") {
+		return false
+	}
 	res, err := url.QueryUnescape(value)
 	if err != nil {
 		return false
 	}
-	trimmed := strings.TrimSpace(res)
+	trimmed = strings.TrimSpace(res)
 	return trimmed == "" || isNullValue(trimmed)
 }
 
