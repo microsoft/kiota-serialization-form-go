@@ -984,6 +984,74 @@ func TestFormSerialization_UnionTypeMockStringRoundTrip(t *testing.T) {
 	assert.Equal(t, "union round trip", *parsedUnion.GetStringValue())
 }
 
+func TestFormSerialization_IntersectionTypeMockRoundTrip(t *testing.T) {
+	// 1. String value round-trip
+	mock := internal.NewIntersectionTypeMock()
+	strVal := "intersection round trip"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	parsedObj, err := node.GetObjectValue(internal.CreateIntersectionTypeMockFromDiscriminator)
+	require.NoError(t, err)
+	require.NotNil(t, parsedObj)
+
+	parsedIntersection, ok := parsedObj.(internal.IntersectionTypeMockable)
+	require.True(t, ok)
+	require.NotNil(t, parsedIntersection.GetStringValue())
+	assert.Equal(t, "intersection round trip", *parsedIntersection.GetStringValue())
+
+	// 2. Composed entities serialization and parsing of merged fields
+	mockComposed := internal.NewIntersectionTypeMock()
+	entity1 := internal.NewTestEntity()
+	id1 := "12345"
+	office := "Studio B"
+	entity1.SetId(&id1)
+	entity1.SetOfficeLocation(&office)
+	mockComposed.SetComposedType1(entity1)
+
+	entity2 := internal.NewSecondTestEntity()
+	displayName := "SecondComposed"
+	rate := 12.5
+	entity2.SetDisplayName(&displayName)
+	entity2.SetFailureRate(&rate)
+	mockComposed.SetComposedType2(entity2)
+
+	writer2 := NewFormSerializationWriter()
+	err = writer2.WriteObjectValue("", mockComposed)
+	require.NoError(t, err)
+
+	content2, err := writer2.GetSerializedContent()
+	require.NoError(t, err)
+
+	node2, err := NewFormParseNode(content2)
+	require.NoError(t, err)
+
+	parsedEntity1, err := node2.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	parsed1, ok := parsedEntity1.(internal.TestEntityable)
+	require.True(t, ok)
+	assert.Equal(t, id1, *parsed1.GetId())
+	assert.Equal(t, office, *parsed1.GetOfficeLocation())
+
+	parsedEntity2, err := node2.GetObjectValue(internal.CreateSecondTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	parsed2, ok := parsedEntity2.(internal.SecondTestEntityable)
+	require.True(t, ok)
+	assert.Equal(t, displayName, *parsed2.GetDisplayName())
+	assert.Equal(t, rate, *parsed2.GetFailureRate())
+	assert.Equal(t, int64(12345), *parsed2.GetId())
+}
+
+
 
 
 
