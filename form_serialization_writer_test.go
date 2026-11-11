@@ -848,4 +848,33 @@ func TestWriteObjectValue_UnionTypeMockSecondary(t *testing.T) {
 	assert.Contains(t, result, "id=98765")
 }
 
+func TestWriteObjectValue_IntersectionTypeMock(t *testing.T) {
+	mock := internal.NewIntersectionTypeMock()
+	entity1 := internal.NewTestEntity()
+	id1 := "test-id-1"
+	office := "Building-A"
+	entity1.SetId(&id1)
+	entity1.SetOfficeLocation(&office)
+	mock.SetComposedType1(entity1)
+
+	entity2 := internal.NewSecondTestEntity()
+	displayName := "ComposedDisplayName"
+	var id2 int64 = 55443
+	entity2.SetDisplayName(&displayName)
+	entity2.SetId(&id2)
+	mock.SetComposedType2(entity2)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "id=test-id-1")
+	assert.Contains(t, result, "officeLocation=Building-A")
+	assert.Contains(t, result, "displayName=ComposedDisplayName")
+}
+
+
 
