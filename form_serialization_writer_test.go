@@ -807,3 +807,24 @@ func TestFormSerialization_StringRoundTrip_LiteralNullPayloads(t *testing.T) {
 	require.NotNil(t, parsed[2])
 	assert.Equal(t, "hello", *parsed[2].(*string))
 }
+
+func TestWriteObjectValue_UnionTypeMockPrimary(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	entity := internal.NewTestEntity()
+	id := "12345"
+	office := "Redmond"
+	entity.SetId(&id)
+	entity.SetOfficeLocation(&office)
+	mock.SetComposedType1(entity)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "id=12345")
+	assert.Contains(t, result, "officeLocation=Redmond")
+}
+
