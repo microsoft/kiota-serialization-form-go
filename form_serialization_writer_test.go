@@ -828,3 +828,24 @@ func TestWriteObjectValue_UnionTypeMockPrimary(t *testing.T) {
 	assert.Contains(t, result, "officeLocation=Redmond")
 }
 
+func TestWriteObjectValue_UnionTypeMockSecondary(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	entity := internal.NewSecondTestEntity()
+	displayName := "SecondModel"
+	var id int64 = 98765
+	entity.SetDisplayName(&displayName)
+	entity.SetId(&id)
+	mock.SetComposedType2(entity)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "displayName=SecondModel")
+	assert.Contains(t, result, "id=98765")
+}
+
+
