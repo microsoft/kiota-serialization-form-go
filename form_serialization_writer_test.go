@@ -876,5 +876,20 @@ func TestWriteObjectValue_IntersectionTypeMock(t *testing.T) {
 	assert.Contains(t, result, "displayName=ComposedDisplayName")
 }
 
+func TestWriteObjectValue_UnionTypeMockStringValue(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	strVal := "hello world"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "hello+world", string(content))
+}
+
+
 
 
