@@ -890,6 +890,19 @@ func TestWriteObjectValue_UnionTypeMockStringValue(t *testing.T) {
 	assert.Equal(t, "hello+world", string(content))
 }
 
+func TestWriteObjectValue_UnionTypeMockEmpty(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content)
+}
+
+
 
 
 
