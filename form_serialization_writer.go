@@ -297,7 +297,7 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 	if w == nil {
 		return errors.New("writer cannot be nil")
 	}
-	if w.depth > 0 {
+	if w.depth > 0 && key != "" {
 		return errors.New("nested objects serialization is not supported with FormSerializationWriter")
 	}
 	w.depth++
