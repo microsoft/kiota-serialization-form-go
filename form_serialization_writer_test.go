@@ -902,6 +902,21 @@ func TestWriteObjectValue_UnionTypeMockEmpty(t *testing.T) {
 	assert.Empty(t, content)
 }
 
+func TestWriteObjectValue_IntersectionTypeMockStringValue(t *testing.T) {
+	mock := internal.NewIntersectionTypeMock()
+	strVal := "intersection text"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "intersection+text", string(content))
+}
+
+
 
 
 
