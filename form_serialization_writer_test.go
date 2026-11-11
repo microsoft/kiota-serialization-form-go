@@ -938,6 +938,28 @@ func TestWriteObjectValue_MultiLevelComposedDelegation(t *testing.T) {
 	assert.Equal(t, "id=deep-id", string(content))
 }
 
+func TestWriteObjectValue_NestedParsableWithNonEmptyKeyFails(t *testing.T) {
+	innerEntityWithNested := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			child := internal.NewTestEntity()
+			return w.WriteObjectValue("nestedProp", child)
+		},
+	}
+
+	outerUnion := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			// Composed delegation with empty key
+			return w.WriteObjectValue("", innerEntityWithNested)
+		},
+	}
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", outerUnion)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+}
+
+
 
 
 
