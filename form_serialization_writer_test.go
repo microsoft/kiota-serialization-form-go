@@ -916,6 +916,29 @@ func TestWriteObjectValue_IntersectionTypeMockStringValue(t *testing.T) {
 	assert.Equal(t, "intersection+text", string(content))
 }
 
+func TestWriteObjectValue_MultiLevelComposedDelegation(t *testing.T) {
+	innerUnion := internal.NewUnionTypeMock()
+	entity := internal.NewTestEntity()
+	id := "deep-id"
+	entity.SetId(&id)
+	innerUnion.SetComposedType1(entity)
+
+	outerWrapper := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			return w.WriteObjectValue("", innerUnion)
+		},
+	}
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", outerWrapper)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "id=deep-id", string(content))
+}
+
+
 
 
 
