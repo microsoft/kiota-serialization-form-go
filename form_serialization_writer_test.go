@@ -959,6 +959,33 @@ func TestWriteObjectValue_NestedParsableWithNonEmptyKeyFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "nested objects serialization is not supported")
 }
 
+func TestFormSerialization_UnionTypeMockStringRoundTrip(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	strVal := "union round trip"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	parsedObj, err := node.GetObjectValue(internal.CreateUnionTypeMockFromDiscriminator)
+	require.NoError(t, err)
+	require.NotNil(t, parsedObj)
+
+	parsedUnion, ok := parsedObj.(internal.UnionTypeMockable)
+	require.True(t, ok)
+	require.NotNil(t, parsedUnion.GetStringValue())
+	assert.Equal(t, "union round trip", *parsedUnion.GetStringValue())
+}
+
+
+
 
 
 
