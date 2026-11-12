@@ -263,7 +263,7 @@ func TestJsonSerializationWriter(t *testing.T) {
 	assert.Equal(t, 0, countStart)
 
 	test := internal.NewTestEntity()
-	err = serializer.WriteObjectValue("name", test)
+	err = serializer.WriteObjectValue("", test)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, countBefore)
@@ -372,14 +372,14 @@ func TestWriteObjectValueDepthLifecycleAndReusability(t *testing.T) {
 	entity1 := internal.NewTestEntity()
 	id1 := "id-1"
 	entity1.SetId(&id1)
-	err := serializer.WriteObjectValue("entity1", entity1)
+	err := serializer.WriteObjectValue("", entity1)
 	require.NoError(t, err)
 
 	// 2. Second top-level object write on the same writer without Close()
 	entity2 := internal.NewTestEntity()
 	id2 := "id-2"
 	entity2.SetId(&id2)
-	err = serializer.WriteObjectValue("entity2", entity2)
+	err = serializer.WriteObjectValue("", entity2)
 	require.NoError(t, err)
 
 	// 3. Nested object serialization attempt inside Serialize() must fail
@@ -391,22 +391,22 @@ func TestWriteObjectValueDepthLifecycleAndReusability(t *testing.T) {
 			return nestedErr
 		},
 	}
-	err = serializer.WriteObjectValue("nested", nestedEntity)
+	err = serializer.WriteObjectValue("", nestedEntity)
 	assert.Error(t, err)
 	assert.Error(t, nestedErr)
 	assert.Contains(t, nestedErr.Error(), "nested objects serialization is not supported")
 
-	// 4. After nested error, top-level depth must be restored so subsequent writes succeed
+	// 4. After nested error, subsequent top-level writes must still succeed
 	entity3 := internal.NewTestEntity()
 	id3 := "id-3"
 	entity3.SetId(&id3)
-	err = serializer.WriteObjectValue("entity3", entity3)
+	err = serializer.WriteObjectValue("", entity3)
 	require.NoError(t, err)
 
-	// 5. Close() must reset depth to 0 and allow new writes
+	// 5. Close() must reset writer state and allow new writes
 	err = serializer.Close()
 	require.NoError(t, err)
-	err = serializer.WriteObjectValue("entity4", entity1)
+	err = serializer.WriteObjectValue("", entity1)
 	require.NoError(t, err)
 }
 
@@ -427,15 +427,15 @@ func TestWriteObjectValueSerializationErrorDoesNotInvokeOnAfter(t *testing.T) {
 		},
 	}
 
-	err = serializer.WriteObjectValue("fail", failingEntity)
+	err = serializer.WriteObjectValue("", failingEntity)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 0, countAfter, "OnAfterObjectSerialization must not be called when Serialize fails")
 
-	// Verify depth was decremented even after error
+	// Verify writer remains usable after serialization error
 	entity := internal.NewTestEntity()
 	id := "test-id"
 	entity.SetId(&id)
-	err = serializer.WriteObjectValue("recovery", entity)
+	err = serializer.WriteObjectValue("", entity)
 	require.NoError(t, err)
 	assert.Equal(t, 1, countAfter, "OnAfterObjectSerialization should be called on successful write")
 }
@@ -806,4 +806,312 @@ func TestFormSerialization_StringRoundTrip_LiteralNullPayloads(t *testing.T) {
 	assert.Equal(t, "NULL", *parsed[1].(*string))
 	require.NotNil(t, parsed[2])
 	assert.Equal(t, "hello", *parsed[2].(*string))
+}
+
+func TestWriteObjectValue_UnionTypeMockPrimary(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	entity := internal.NewTestEntity()
+	id := "12345"
+	office := "Redmond"
+	entity.SetId(&id)
+	entity.SetOfficeLocation(&office)
+	mock.SetComposedType1(entity)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "id=12345")
+	assert.Contains(t, result, "officeLocation=Redmond")
+}
+
+func TestWriteObjectValue_UnionTypeMockSecondary(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	entity := internal.NewSecondTestEntity()
+	displayName := "SecondModel"
+	var id int64 = 98765
+	entity.SetDisplayName(&displayName)
+	entity.SetId(&id)
+	mock.SetComposedType2(entity)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "displayName=SecondModel")
+	assert.Contains(t, result, "id=98765")
+}
+
+func TestWriteObjectValue_IntersectionTypeMock(t *testing.T) {
+	mock := internal.NewIntersectionTypeMock()
+	entity1 := internal.NewTestEntity()
+	id1 := "test-id-1"
+	office := "Building-A"
+	entity1.SetId(&id1)
+	entity1.SetOfficeLocation(&office)
+	mock.SetComposedType1(entity1)
+
+	entity2 := internal.NewSecondTestEntity()
+	displayName := "ComposedDisplayName"
+	var id2 int64 = 55443
+	entity2.SetDisplayName(&displayName)
+	entity2.SetId(&id2)
+	mock.SetComposedType2(entity2)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	result := string(content)
+	assert.Contains(t, result, "id=test-id-1")
+	assert.Contains(t, result, "officeLocation=Building-A")
+	assert.Contains(t, result, "displayName=ComposedDisplayName")
+}
+
+func TestWriteObjectValue_UnionTypeMockStringValue(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	strVal := "hello world"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "hello+world", string(content))
+}
+
+func TestWriteObjectValue_UnionTypeMockEmpty(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Empty(t, content)
+}
+
+func TestWriteObjectValue_IntersectionTypeMockStringValue(t *testing.T) {
+	mock := internal.NewIntersectionTypeMock()
+	strVal := "intersection text"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "intersection+text", string(content))
+}
+
+func TestWriteObjectValue_MultiLevelComposedDelegation(t *testing.T) {
+	innerUnion := internal.NewUnionTypeMock()
+	entity := internal.NewTestEntity()
+	id := "deep-id"
+	entity.SetId(&id)
+	innerUnion.SetComposedType1(entity)
+
+	outerWrapper := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			return w.WriteObjectValue("", innerUnion)
+		},
+	}
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", outerWrapper)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "id=deep-id", string(content))
+}
+
+func TestWriteObjectValue_NestedParsableWithNonEmptyKeyFails(t *testing.T) {
+	innerEntityWithNested := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			child := internal.NewTestEntity()
+			return w.WriteObjectValue("nestedProp", child)
+		},
+	}
+
+	outerUnion := &mockTestParsable{
+		serializeFunc: func(w absser.SerializationWriter) error {
+			// Composed delegation with empty key
+			return w.WriteObjectValue("", innerEntityWithNested)
+		},
+	}
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", outerUnion)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+}
+
+func TestFormSerialization_UnionTypeMockStringRoundTrip(t *testing.T) {
+	mock := internal.NewUnionTypeMock()
+	strVal := "union round trip"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	parsedObj, err := node.GetObjectValue(internal.CreateUnionTypeMockFromDiscriminator)
+	require.NoError(t, err)
+	require.NotNil(t, parsedObj)
+
+	parsedUnion, ok := parsedObj.(internal.UnionTypeMockable)
+	require.True(t, ok)
+	require.NotNil(t, parsedUnion.GetStringValue())
+	assert.Equal(t, "union round trip", *parsedUnion.GetStringValue())
+}
+
+func TestFormSerialization_IntersectionTypeMockRoundTrip(t *testing.T) {
+	// 1. String value round-trip
+	mock := internal.NewIntersectionTypeMock()
+	strVal := "intersection round trip"
+	mock.SetStringValue(&strVal)
+
+	writer := NewFormSerializationWriter()
+	err := writer.WriteObjectValue("", mock)
+	require.NoError(t, err)
+
+	content, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+
+	node, err := NewFormParseNode(content)
+	require.NoError(t, err)
+
+	parsedObj, err := node.GetObjectValue(internal.CreateIntersectionTypeMockFromDiscriminator)
+	require.NoError(t, err)
+	require.NotNil(t, parsedObj)
+
+	parsedIntersection, ok := parsedObj.(internal.IntersectionTypeMockable)
+	require.True(t, ok)
+	require.NotNil(t, parsedIntersection.GetStringValue())
+	assert.Equal(t, "intersection round trip", *parsedIntersection.GetStringValue())
+
+	// 2. Composed entities serialization and parsing of merged fields
+	mockComposed := internal.NewIntersectionTypeMock()
+	entity1 := internal.NewTestEntity()
+	id1 := "12345"
+	office := "Studio B"
+	entity1.SetId(&id1)
+	entity1.SetOfficeLocation(&office)
+	mockComposed.SetComposedType1(entity1)
+
+	entity2 := internal.NewSecondTestEntity()
+	displayName := "SecondComposed"
+	rate := 12.5
+	entity2.SetDisplayName(&displayName)
+	entity2.SetFailureRate(&rate)
+	mockComposed.SetComposedType2(entity2)
+
+	writer2 := NewFormSerializationWriter()
+	err = writer2.WriteObjectValue("", mockComposed)
+	require.NoError(t, err)
+
+	content2, err := writer2.GetSerializedContent()
+	require.NoError(t, err)
+
+	node2, err := NewFormParseNode(content2)
+	require.NoError(t, err)
+
+	parsedEntity1, err := node2.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	parsed1, ok := parsedEntity1.(internal.TestEntityable)
+	require.True(t, ok)
+	assert.Equal(t, id1, *parsed1.GetId())
+	assert.Equal(t, office, *parsed1.GetOfficeLocation())
+
+	parsedEntity2, err := node2.GetObjectValue(internal.CreateSecondTestEntityFromDiscriminator)
+	require.NoError(t, err)
+	parsed2, ok := parsedEntity2.(internal.SecondTestEntityable)
+	require.True(t, ok)
+	assert.Equal(t, displayName, *parsed2.GetDisplayName())
+	assert.Equal(t, rate, *parsed2.GetFailureRate())
+	assert.Equal(t, int64(12345), *parsed2.GetId())
+}
+
+func TestWriteObjectValue_KeyedObjectAndCompositionRejected(t *testing.T) {
+	entity := internal.NewTestEntity()
+	id := "123"
+	entity.SetId(&id)
+
+	t.Run("rejects keyed union at top level without emitting partial output", func(t *testing.T) {
+		union := internal.NewUnionTypeMock()
+		union.SetComposedType1(entity)
+
+		writer := NewFormSerializationWriter()
+		err := writer.WriteObjectValue("manager", union)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+
+		content, contentErr := writer.GetSerializedContent()
+		require.NoError(t, contentErr)
+		assert.Empty(t, content)
+	})
+
+	t.Run("rejects keyed entity at top level", func(t *testing.T) {
+		writer := NewFormSerializationWriter()
+		err := writer.WriteObjectValue("manager", entity)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+
+		content, contentErr := writer.GetSerializedContent()
+		require.NoError(t, contentErr)
+		assert.Empty(t, content)
+	})
+
+	t.Run("rejects keyed intersection at top level", func(t *testing.T) {
+		intersection := internal.NewIntersectionTypeMock()
+		intersection.SetComposedType1(entity)
+
+		writer := NewFormSerializationWriter()
+		err := writer.WriteObjectValue("manager", intersection)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+	})
+
+	t.Run("rejects keyed union delegated from outer wrapper", func(t *testing.T) {
+		innerUnion := internal.NewUnionTypeMock()
+		innerUnion.SetComposedType1(entity)
+		outerWrapper := &mockTestParsable{
+			serializeFunc: func(w absser.SerializationWriter) error {
+				return w.WriteObjectValue("manager", innerUnion)
+			},
+		}
+
+		writer := NewFormSerializationWriter()
+		err := writer.WriteObjectValue("", outerWrapper)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+	})
+
+	t.Run("rejects parsable in WriteAdditionalData", func(t *testing.T) {
+		writer := NewFormSerializationWriter()
+		err := writer.WriteAdditionalData(map[string]interface{}{
+			"manager": entity,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
+	})
 }
