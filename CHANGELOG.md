@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.8](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.7...v1.1.8) (2026-11-13)
+
+
+### Bug Fixes
+
+* **form:** allow root delegation in WriteObjectValue for union and intersection types ([ec6aaad](https://github.com/microsoft/kiota-serialization-form-go/commit/ec6aaad8307a7d041678011688f2debadb52a448))
+* **form:** allow root delegation in WriteObjectValue for union and intersection types ([e92d181](https://github.com/microsoft/kiota-serialization-form-go/commit/e92d18169fb52279c33fdf20a49a2a233c530e14))
+* **form:** reject non-empty object keys in WriteObjectValue regardless of depth ([793ba6d](https://github.com/microsoft/kiota-serialization-form-go/commit/793ba6d3427daade507acfe358e08da99946e6b2))
+* **form:** return nil for null and whitespace object and collection nodes in FormParseNode ([9cfeef2](https://github.com/microsoft/kiota-serialization-form-go/commit/9cfeef25e5190c22782929d19ab97c588f415d09))
+
 ## [1.1.7](https://github.com/microsoft/kiota-serialization-form-go/compare/v1.1.6...v1.1.7) (2026-11-09)
 
 
