@@ -460,8 +460,7 @@ func (w *FormSerializationWriter) GetSerializedContent() ([]byte, error) {
 	if w == nil {
 		return nil, errors.New("writer cannot be nil")
 	}
-	w.trimLastPropertySeparator()
-	resultStr := strings.Join(w.writer, "")
+	resultStr := strings.TrimSuffix(strings.Join(w.writer, ""), "&")
 	return []byte(resultStr), nil
 }
 

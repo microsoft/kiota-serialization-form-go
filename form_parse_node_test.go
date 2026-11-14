@@ -1314,6 +1314,58 @@ func TestFormParseNode_PrimitiveCollectionSchemaAliases(t *testing.T) {
 	require.Len(t, timesDash, 2)
 }
 
+func TestGetCollectionOfPrimitiveValues_ExtendedAliases(t *testing.T) {
+	source := "guids=6ba7b810-9dad-11d1-80b4-00c04fd430c8,6ba7b811-9dad-11d1-80b4-00c04fd430c8&" +
+		"decimals=12.34,56.78&" +
+		"sbytes=-12,42&" +
+		"dates=2023-01-01,2023-01-02&" +
+		"times=12:30:00,14:45:00"
+	node, err := NewFormParseNode([]byte(source))
+	require.NoError(t, err)
+
+	// Test "guid" alias for UUID
+	guidsChild, err := node.GetChildNode("guids")
+	require.NoError(t, err)
+	guids, err := guidsChild.GetCollectionOfPrimitiveValues("guid")
+	require.NoError(t, err)
+	require.Len(t, guids, 2)
+	assert.Equal(t, uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), *guids[0].(*uuid.UUID))
+
+	// Test "decimal" alias for Float64
+	decimalsChild, err := node.GetChildNode("decimals")
+	require.NoError(t, err)
+	decimals, err := decimalsChild.GetCollectionOfPrimitiveValues("decimal")
+	require.NoError(t, err)
+	require.Len(t, decimals, 2)
+	assert.Equal(t, 12.34, *decimals[0].(*float64))
+
+	// Test "sbyte" alias for Int8
+	sbytesChild, err := node.GetChildNode("sbytes")
+	require.NoError(t, err)
+	sbytes, err := sbytesChild.GetCollectionOfPrimitiveValues("sbyte")
+	require.NoError(t, err)
+	require.Len(t, sbytes, 2)
+	assert.Equal(t, int8(-12), *sbytes[0].(*int8))
+	assert.Equal(t, int8(42), *sbytes[1].(*int8))
+
+	// Test "date" and "date-only" aliases for DateOnly
+	datesChild, err := node.GetChildNode("dates")
+	require.NoError(t, err)
+	dates1, err := datesChild.GetCollectionOfPrimitiveValues("date")
+	require.NoError(t, err)
+	require.Len(t, dates1, 2)
+	dates2, err := datesChild.GetCollectionOfPrimitiveValues("date-only")
+	require.NoError(t, err)
+	require.Len(t, dates2, 2)
+
+	// Test "time-only" alias for TimeOnly
+	timesChild, err := node.GetChildNode("times")
+	require.NoError(t, err)
+	times, err := timesChild.GetCollectionOfPrimitiveValues("time-only")
+	require.NoError(t, err)
+	require.Len(t, times, 2)
+}
+
 func TestFormParseNode_ByteArrayValidBase64CasePayloads(t *testing.T) {
 	node, err := NewFormParseNode([]byte("upper=NULL&mixed=Null&lower=null"))
 	require.NoError(t, err)
@@ -1594,5 +1646,35 @@ func TestFormParseNode_KeySanitizationAndIndexValidation(t *testing.T) {
 	tagVal, err := tagChild.GetStringValue()
 	require.NoError(t, err)
 	assert.Equal(t, "golang", *tagVal)
+}
+
+func TestFormParseNode_GetChildNode_LiteralUnescapedKeyCharacters(t *testing.T) {
+	// Form payload containing an escaped key that decodes to a literal percent sign
+	payload := "discount%25=15&rate%25=3.5"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	// Direct lookup with unescaped key containing '%' should succeed without URL escape error
+	child, err := node.GetChildNode("discount%")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+	val, err := child.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, val)
+	assert.Equal(t, int32(15), *val)
+
+	// Escaped lookup should also succeed
+	childEscaped, err := node.GetChildNode("discount%25")
+	require.NoError(t, err)
+	require.NotNil(t, childEscaped)
+	valEscaped, err := childEscaped.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, valEscaped)
+	assert.Equal(t, int32(15), *valEscaped)
+
+	// Non-existent key with invalid escape syntax should still return error
+	invalidChild, err := node.GetChildNode("nonexistent%invalid")
+	require.Error(t, err)
+	assert.Nil(t, invalidChild)
 }
 
