@@ -200,13 +200,13 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 		return getStringValue(value)
 	case "bool", "boolean":
 		return getBoolValue(value)
-	case "int8", "uint8":
+	case "int8", "uint8", "sbyte":
 		return getInt8Value(value)
 	case "byte":
 		return getByteValue(value)
 	case "float32", "float":
 		return getFloat32Value(value)
-	case "float64", "double":
+	case "float64", "double", "decimal":
 		return getFloat64Value(value)
 	case "int32":
 		return getInt32Value(value)
@@ -214,13 +214,13 @@ func getPrimitiveValue(value string, targetType string) (interface{}, error) {
 		return getInt64Value(value)
 	case "time", "datetime", "date-time":
 		return getTimeValue(value)
-	case "timeonly":
+	case "timeonly", "time-only":
 		return getTimeOnlyValue(value)
-	case "dateonly":
+	case "dateonly", "date", "date-only":
 		return getDateOnlyValue(value)
 	case "isoduration", "duration":
 		return getISODurationValue(value)
-	case "uuid":
+	case "uuid", "guid":
 		return getUUIDValue(value)
 	case "base64", "[]byte", "bytearray", "binary":
 		return getByteArrayValue(value)
