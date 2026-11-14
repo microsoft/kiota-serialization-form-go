@@ -80,17 +80,21 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if n == nil {
 		return nil, errors.New("node is nil")
 	}
-	if strings.TrimSpace(index) == "" {
+	trimmedIndex := strings.TrimSpace(index)
+	if trimmedIndex == "" {
 		return nil, errors.New("index is empty")
 	}
-	key, err := sanitizeKey(index)
-	if err != nil {
-		return nil, err
+	fieldValue, ok := n.fields[trimmedIndex]
+	if !ok {
+		key, err := sanitizeKey(trimmedIndex)
+		if err != nil {
+			return nil, err
+		}
+		if key == "" {
+			return nil, errors.New("index is empty")
+		}
+		fieldValue, ok = n.fields[key]
 	}
-	if key == "" {
-		return nil, errors.New("index is empty")
-	}
-	fieldValue, ok := n.fields[key]
 	if !ok {
 		return nil, nil
 	}
