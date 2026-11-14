@@ -1596,3 +1596,33 @@ func TestFormParseNode_KeySanitizationAndIndexValidation(t *testing.T) {
 	assert.Equal(t, "golang", *tagVal)
 }
 
+func TestFormParseNode_GetChildNode_LiteralUnescapedKeyCharacters(t *testing.T) {
+	// Form payload containing an escaped key that decodes to a literal percent sign
+	payload := "discount%25=15&rate%25=3.5"
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+
+	// Direct lookup with unescaped key containing '%' should succeed without URL escape error
+	child, err := node.GetChildNode("discount%")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+	val, err := child.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, val)
+	assert.Equal(t, int32(15), *val)
+
+	// Escaped lookup should also succeed
+	childEscaped, err := node.GetChildNode("discount%25")
+	require.NoError(t, err)
+	require.NotNil(t, childEscaped)
+	valEscaped, err := childEscaped.GetInt32Value()
+	require.NoError(t, err)
+	require.NotNil(t, valEscaped)
+	assert.Equal(t, int32(15), *valEscaped)
+
+	// Non-existent key with invalid escape syntax should still return error
+	invalidChild, err := node.GetChildNode("nonexistent%invalid")
+	require.Error(t, err)
+	assert.Nil(t, invalidChild)
+}
+
