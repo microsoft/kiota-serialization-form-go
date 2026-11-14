@@ -1115,3 +1115,29 @@ func TestWriteObjectValue_KeyedObjectAndCompositionRejected(t *testing.T) {
 		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
 	})
 }
+
+func TestFormSerialization_SequentialGetSerializedContentAndWrites(t *testing.T) {
+	writer := NewFormSerializationWriter()
+	strVal1 := "first"
+	strVal2 := "second"
+	intVal := int32(42)
+
+	require.NoError(t, writer.WriteStringValue("prop1", &strVal1))
+
+	content1, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first", string(content1))
+
+	// Verify idempotence of multiple GetSerializedContent calls
+	content1Repeat, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first", string(content1Repeat))
+
+	// Write subsequent properties after reading serialized content
+	require.NoError(t, writer.WriteStringValue("prop2", &strVal2))
+	require.NoError(t, writer.WriteInt32Value("prop3", &intVal))
+
+	content2, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first&prop2=second&prop3=42", string(content2))
+}
