@@ -1115,3 +1115,76 @@ func TestWriteObjectValue_KeyedObjectAndCompositionRejected(t *testing.T) {
 		assert.Contains(t, err.Error(), "nested objects serialization is not supported")
 	})
 }
+
+func TestFormSerialization_SequentialGetSerializedContentAndWrites(t *testing.T) {
+	writer := NewFormSerializationWriter()
+	strVal1 := "first"
+	strVal2 := "second"
+	intVal := int32(42)
+
+	require.NoError(t, writer.WriteStringValue("prop1", &strVal1))
+
+	content1, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first", string(content1))
+
+	// Verify idempotence of multiple GetSerializedContent calls
+	content1Repeat, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first", string(content1Repeat))
+
+	// Write subsequent properties after reading serialized content
+	require.NoError(t, writer.WriteStringValue("prop2", &strVal2))
+	require.NoError(t, writer.WriteInt32Value("prop3", &intVal))
+
+	content2, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "prop1=first&prop2=second&prop3=42", string(content2))
+}
+
+func TestFormSerialization_EndToEndIncrementalRoundTrip(t *testing.T) {
+	writer := NewFormSerializationWriter()
+
+	// 1. Initial write
+	name := "Alice"
+	require.NoError(t, writer.WriteStringValue("name", &name))
+	bytes1, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "name=Alice", string(bytes1))
+
+	// 2. Incremental writes with collections and special characters
+	rate := float64(9.99)
+	require.NoError(t, writer.WriteFloat64Value("rate%", &rate))
+	require.NoError(t, writer.WriteCollectionOfStringValues("tags", []string{"go", "kiota", "sdk"}))
+
+	finalBytes, err := writer.GetSerializedContent()
+	require.NoError(t, err)
+	assert.Equal(t, "name=Alice&rate%25=9.99&tags=go&tags=kiota&tags=sdk", string(finalBytes))
+
+	// 3. Parse and verify round trip
+	node, err := NewFormParseNode(finalBytes)
+	require.NoError(t, err)
+
+	nameChild, err := node.GetChildNode("name")
+	require.NoError(t, err)
+	require.NotNil(t, nameChild)
+	parsedName, err := nameChild.GetStringValue()
+	require.NoError(t, err)
+	assert.Equal(t, "Alice", *parsedName)
+
+	// Verify direct lookup with unescaped key containing '%'
+	rateChild, err := node.GetChildNode("rate%")
+	require.NoError(t, err)
+	require.NotNil(t, rateChild)
+	parsedRate, err := rateChild.GetFloat64Value()
+	require.NoError(t, err)
+	assert.Equal(t, 9.99, *parsedRate)
+
+	// Verify collection parsing
+	tagsChild, err := node.GetChildNode("tags")
+	require.NoError(t, err)
+	require.NotNil(t, tagsChild)
+	parsedTags, err := tagsChild.GetCollectionOfPrimitiveValues("string")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{ref("go"), ref("kiota"), ref("sdk")}, parsedTags)
+}
