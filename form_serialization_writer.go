@@ -50,15 +50,6 @@ func (w *FormSerializationWriter) writePropertySeparator() {
 	}
 	w.writer = append(w.writer, "&")
 }
-func (w *FormSerializationWriter) trimLastPropertySeparator() {
-	if w == nil {
-		return
-	}
-	lastIdx := len(w.writer) - 1
-	if lastIdx > -1 && w.writer[lastIdx] == "&" {
-		w.writer[lastIdx] = ""
-	}
-}
 
 // WriteStringValue writes a String value to underlying the byte array.
 func (w *FormSerializationWriter) WriteStringValue(key string, value *string) error {
