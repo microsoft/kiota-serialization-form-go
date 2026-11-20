@@ -1926,9 +1926,9 @@ func TestFormParseNode_UntypedAssignmentCallbacks_RepeatedAndScalars(t *testing.
 		assert.Len(t, beforeItems, 4)
 		assert.Len(t, afterItems, 4)
 		assert.IsType(t, &absser.UntypedObject{}, beforeItems[0])
-		assert.IsType(t, &absser.UntypedString{}, beforeItems[1])
+		assert.IsType(t, &absser.UntypedArray{}, beforeItems[1])
 		assert.IsType(t, &absser.UntypedString{}, beforeItems[2])
-		assert.IsType(t, &absser.UntypedArray{}, beforeItems[3])
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[3])
 
 		assert.IsType(t, &absser.UntypedString{}, afterItems[0])
 		assert.IsType(t, &absser.UntypedString{}, afterItems[1])

@@ -312,6 +312,8 @@ func isZeroMantissa(s string) bool {
 func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
 	if len(n.values) > 1 {
 		elements := make([]absser.UntypedNodeable, len(n.values))
+		arr := absser.NewUntypedArray(elements)
+		abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), arr)
 		for i, rawVal := range n.values {
 			child := &FormParseNode{
 				value:                     rawVal,
@@ -328,8 +330,6 @@ func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
 				elements[i] = absser.NewUntypedNull()
 			}
 		}
-		arr := absser.NewUntypedArray(elements)
-		abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), arr)
 		abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), arr)
 		return arr, nil
 	}

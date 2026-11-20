@@ -283,31 +283,6 @@ func isNil(val any) bool {
 	}
 }
 
-func isAmbiguousUntypedString(s string) bool {
-	if strings.TrimSpace(s) != s || s == "" {
-		return false
-	}
-	if strings.EqualFold(s, "null") {
-		return true
-	}
-	if strings.EqualFold(s, "true") || strings.EqualFold(s, "false") {
-		return true
-	}
-	if isCanonicalInteger(s) {
-		if _, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return true
-		}
-	}
-	if isCanonicalFloat(s) {
-		if f64, err := strconv.ParseFloat(s, 64); err == nil && !math.IsNaN(f64) && !math.IsInf(f64, 0) {
-			if f64 != 0 || isZeroMantissa(s) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func formatUntypedFloat(f float64, bitSize int) (string, error) {
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return "", errors.New("non-finite float values are not supported in form URL-encoded serialization")
@@ -398,9 +373,6 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 				writeErr = w.WriteNullValue(key)
 			case *absser.UntypedString:
 				if v := value.GetValue(); v != nil {
-					if isAmbiguousUntypedString(*v) {
-						return errors.New("ambiguous untyped string values resembling primitives are not supported with FormSerializationWriter")
-					}
 					writeErr = w.WriteStringValue(key, v)
 				} else {
 					writeErr = w.WriteNullValue(key)

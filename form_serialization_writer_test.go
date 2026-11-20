@@ -1530,26 +1530,21 @@ func TestFormSerialization_UntypedWriterEdgeCases(t *testing.T) {
 		assert.Equal(t, "a=val2&m=val3&z=val1", string(content))
 	})
 
-	t.Run("rejects ambiguous untyped strings that resemble primitives", func(t *testing.T) {
-		ambiguous := []string{"null", "NULL", "true", "TRUE", "false", "FALSE", "42", "-17", "1.20", "0.0", "-0.0"}
-		for _, s := range ambiguous {
+	t.Run("serializes untyped strings including numeric, boolean, and null tokens", func(t *testing.T) {
+		tokens := []string{"123", "true", "false", "null", "42", "-17", "1.20", "0.0", "hello"}
+		for _, s := range tokens {
 			w := NewFormSerializationWriter()
 			err := w.WriteObjectValue("key", absser.NewUntypedString(s))
-			assert.ErrorContains(t, err, "ambiguous untyped string values resembling primitives are not supported")
+			require.NoError(t, err)
+			content, err := w.GetSerializedContent()
+			require.NoError(t, err)
+			assert.Equal(t, fmt.Sprintf("key=%s", s), string(content))
 			w.Close()
 
 			obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
 				"key": absser.NewUntypedString(s),
 			})
-			assert.ErrorContains(t, serializeUntypedError(t, "", obj), "ambiguous untyped string values resembling primitives are not supported")
-		}
-
-		nonAmbiguous := []string{"hello", "nullify", "true_val", " 42 ", "001.20", "+1.5"}
-		for _, s := range nonAmbiguous {
-			w := NewFormSerializationWriter()
-			err := w.WriteObjectValue("key", absser.NewUntypedString(s))
-			assert.NoError(t, err)
-			w.Close()
+			assert.Equal(t, fmt.Sprintf("key=%s", s), serializeUntyped(t, "", obj))
 		}
 	})
 
