@@ -3,10 +3,12 @@ package formserialization
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/microsoft/kiota-serialization-form-go/internal"
+	"math"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/microsoft/kiota-serialization-form-go/internal"
 
 	assert "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -477,7 +479,6 @@ func TestWriteAdditionalDataErrorPropagationAndIntSupport(t *testing.T) {
 	err = errSerializer.WriteAdditionalData(errData)
 	assert.Error(t, err)
 }
-
 
 func TestWriteAnyValueAndCollectionOfObjectValuesNilSucceeds(t *testing.T) {
 	serializer := NewFormSerializationWriter()
@@ -1187,4 +1188,345 @@ func TestFormSerialization_EndToEndIncrementalRoundTrip(t *testing.T) {
 	parsedTags, err := tagsChild.GetCollectionOfPrimitiveValues("string")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{ref("go"), ref("kiota"), ref("sdk")}, parsedTags)
+}
+
+func serializeUntyped(t *testing.T, key string, item absser.Parsable, extra ...absser.Parsable) string {
+	t.Helper()
+	w := NewFormSerializationWriter()
+	defer w.Close()
+	require.NoError(t, w.WriteObjectValue(key, item, extra...))
+	content, err := w.GetSerializedContent()
+	require.NoError(t, err)
+	return string(content)
+}
+
+func serializeUntypedError(t *testing.T, key string, item absser.Parsable, extra ...absser.Parsable) error {
+	t.Helper()
+	w := NewFormSerializationWriter()
+	defer w.Close()
+	return w.WriteObjectValue(key, item, extra...)
+}
+
+func TestWriteObjectValue_UntypedNodes(t *testing.T) {
+	t.Run("serializes scalar untyped primitives with key", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		require.NoError(t, w.WriteObjectValue("str", absser.NewUntypedString("hello world")))
+		require.NoError(t, w.WriteObjectValue("bool", absser.NewUntypedBoolean(true)))
+		require.NoError(t, w.WriteObjectValue("int", absser.NewUntypedInteger(42)))
+		require.NoError(t, w.WriteObjectValue("long", absser.NewUntypedLong(9007199254740993)))
+		require.NoError(t, w.WriteObjectValue("float", absser.NewUntypedFloat(3.14)))
+		require.NoError(t, w.WriteObjectValue("double", absser.NewUntypedDouble(2.71828)))
+		require.NoError(t, w.WriteObjectValue("nilVal", absser.NewUntypedNull()))
+		content, err := w.GetSerializedContent()
+		require.NoError(t, err)
+		str := string(content)
+		for _, exp := range []string{"str=hello+world", "bool=true", "int=42", "long=9007199254740993", "float=3.14", "double=2.71828", "nilVal=null"} {
+			assert.Contains(t, str, exp)
+		}
+	})
+
+	t.Run("serializes root UntypedObject", func(t *testing.T) {
+		str := serializeUntyped(t, "", absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"title":    absser.NewUntypedString("Form Spec"),
+			"priority": absser.NewUntypedInteger(1),
+			"enabled":  absser.NewUntypedBoolean(true),
+		}))
+		assert.Contains(t, str, "title=Form+Spec")
+		assert.Contains(t, str, "priority=1")
+		assert.Contains(t, str, "enabled=true")
+	})
+
+	t.Run("rejects nested UntypedObject with non-empty key", func(t *testing.T) {
+		err := serializeUntypedError(t, "nested", absser.NewUntypedObject(map[string]absser.UntypedNodeable{"inner": absser.NewUntypedString("val")}))
+		assert.ErrorContains(t, err, "nested objects serialization is not supported")
+	})
+
+	t.Run("serializes keyed UntypedArray of primitives as repeated parameters", func(t *testing.T) {
+		arr := absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("first"), absser.NewUntypedString("second")})
+		assert.Equal(t, "tags=first&tags=second", serializeUntyped(t, "tags", arr))
+	})
+
+	t.Run("rejects root UntypedArray in WriteObjectValue", func(t *testing.T) {
+		err := serializeUntypedError(t, "", absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("item")}))
+		assert.ErrorContains(t, err, "collections serialization is not supported")
+	})
+
+	t.Run("rejects keyed UntypedArray containing UntypedObject", func(t *testing.T) {
+		nested := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"inner": absser.NewUntypedString("val")})
+		arr := absser.NewUntypedArray([]absser.UntypedNodeable{nested, absser.NewUntypedString("item2")})
+		assert.ErrorContains(t, serializeUntypedError(t, "items", arr), "nested objects serialization is not supported")
+	})
+
+	t.Run("WriteAdditionalData with untyped nodes", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		require.NoError(t, w.WriteAdditionalData(map[string]interface{}{
+			"extraString":  absser.NewUntypedString("extra"),
+			"extraBoolean": absser.NewUntypedBoolean(false),
+			"extraInteger": absser.NewUntypedInteger(99),
+			"extraNull":    absser.NewUntypedNull(),
+		}))
+		content, err := w.GetSerializedContent()
+		require.NoError(t, err)
+		for _, exp := range []string{"extraString=extra", "extraBoolean=false", "extraInteger=99", "extraNull=null"} {
+			assert.Contains(t, string(content), exp)
+		}
+	})
+}
+
+func TestFormSerialization_UntypedObjectAndCollectionEndToEndRoundTrip(t *testing.T) {
+	t.Run("untyped object full round-trip", func(t *testing.T) {
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"strVal":  absser.NewUntypedString("Kiota Form Serialization"),
+			"boolVal": absser.NewUntypedBoolean(true),
+			"intVal":  absser.NewUntypedInteger(12345),
+			"longVal": absser.NewUntypedLong(9007199254740993),
+			"fltVal":  absser.NewUntypedDouble(12.75),
+			"nullVal": absser.NewUntypedNull(),
+		})
+		str := serializeUntyped(t, "", obj)
+		pn, err := NewFormParseNode([]byte(str))
+		require.NoError(t, err)
+		res, err := pn.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		props := res.(*absser.UntypedObject).GetValue()
+		assert.Equal(t, "Kiota Form Serialization", *props["strVal"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, true, *props["boolVal"].(*absser.UntypedBoolean).GetValue())
+		assert.Equal(t, int32(12345), *props["intVal"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, int64(9007199254740993), *props["longVal"].(*absser.UntypedLong).GetValue())
+		assert.Equal(t, 12.75, *props["fltVal"].(*absser.UntypedDouble).GetValue())
+		assert.NotNil(t, props["nullVal"].(*absser.UntypedNull))
+	})
+
+	t.Run("entity with AdditionalData containing untyped nodes round-trip", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		entity := internal.NewTestEntity()
+		id := "test-id-123"
+		entity.SetId(&id)
+		require.NoError(t, w.WriteObjectValue("", entity))
+		require.NoError(t, w.WriteAdditionalData(map[string]interface{}{
+			"extraString":  absser.NewUntypedString("extraVal"),
+			"extraBoolean": absser.NewUntypedBoolean(true),
+			"extraInteger": absser.NewUntypedInteger(42),
+			"extraNull":    absser.NewUntypedNull(),
+		}))
+		content, err := w.GetSerializedContent()
+		require.NoError(t, err)
+		str := string(content)
+		for _, exp := range []string{"id=test-id-123", "extraString=extraVal", "extraBoolean=true", "extraInteger=42", "extraNull=null"} {
+			assert.Contains(t, str, exp)
+		}
+	})
+
+	t.Run("entity deserialization populates additional data from form fields", func(t *testing.T) {
+		pn, err := NewFormParseNode([]byte("id=entity-789&customKey=customValue&extraNum=99"))
+		require.NoError(t, err)
+		res, err := pn.GetObjectValue(internal.CreateTestEntityFromDiscriminator)
+		require.NoError(t, err)
+		entity := res.(*internal.TestEntity)
+		assert.Equal(t, "entity-789", *entity.GetId())
+		assert.Equal(t, "customValue", entity.GetAdditionalData()["customKey"])
+		assert.Equal(t, "99", entity.GetAdditionalData()["extraNum"])
+	})
+}
+
+func TestFormSerialization_MergeBehavior(t *testing.T) {
+	t.Run("UntypedObject followed by regular entity", func(t *testing.T) {
+		id := "entity-123"
+		entity := internal.NewTestEntity()
+		entity.SetId(&id)
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"untypedProp": absser.NewUntypedString("untypedVal")})
+		str := serializeUntyped(t, "", obj, entity)
+		assert.Contains(t, str, "untypedProp=untypedVal")
+		assert.Contains(t, str, "id=entity-123")
+	})
+
+	t.Run("regular entity followed by UntypedObject", func(t *testing.T) {
+		id := "entity-456"
+		entity := internal.NewTestEntity()
+		entity.SetId(&id)
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"extraField": absser.NewUntypedString("extraVal")})
+		str := serializeUntyped(t, "", entity, obj)
+		assert.Contains(t, str, "id=entity-456")
+		assert.Contains(t, str, "extraField=extraVal")
+	})
+
+	t.Run("multiple UntypedObjects merged", func(t *testing.T) {
+		obj1 := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"prop1": absser.NewUntypedString("val1")})
+		obj2 := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"prop2": absser.NewUntypedInteger(100)})
+		obj3 := absser.NewUntypedObject(map[string]absser.UntypedNodeable{"prop3": absser.NewUntypedBoolean(true)})
+		str := serializeUntyped(t, "", obj1, obj2, obj3)
+		assert.Contains(t, str, "prop1=val1")
+		assert.Contains(t, str, "prop2=100")
+		assert.Contains(t, str, "prop3=true")
+	})
+}
+
+func TestFormSerialization_SerializationCallbacks(t *testing.T) {
+	t.Run("invokes callbacks in order on UntypedObject", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		events := []string{}
+		require.NoError(t, w.SetOnBeforeSerialization(func(p absser.Parsable) error {
+			events = append(events, "before")
+			return nil
+		}))
+		require.NoError(t, w.SetOnStartObjectSerialization(func(p absser.Parsable, sw absser.SerializationWriter) error {
+			events = append(events, "start")
+			val := "callbackVal"
+			return sw.WriteStringValue("callbackProp", &val)
+		}))
+		require.NoError(t, w.SetOnAfterObjectSerialization(func(p absser.Parsable) error {
+			events = append(events, "after")
+			return nil
+		}))
+		require.NoError(t, w.WriteObjectValue("", absser.NewUntypedObject(map[string]absser.UntypedNodeable{"title": absser.NewUntypedString("Doc")})))
+		assert.Equal(t, []string{"before", "start", "after"}, events)
+		content, _ := w.GetSerializedContent()
+		assert.Contains(t, string(content), "callbackProp=callbackVal")
+		assert.Contains(t, string(content), "title=Doc")
+	})
+
+	t.Run("callback error propagates and prevents subsequent writes", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		expectedErr := errors.New("callback start failure")
+		require.NoError(t, w.SetOnStartObjectSerialization(func(p absser.Parsable, sw absser.SerializationWriter) error { return expectedErr }))
+		assert.ErrorIs(t, w.WriteObjectValue("", absser.NewUntypedObject(map[string]absser.UntypedNodeable{"k": absser.NewUntypedString("v")})), expectedErr)
+	})
+
+	t.Run("scalar untyped nodes do not invoke object callbacks", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		startCalled := false
+		require.NoError(t, w.SetOnStartObjectSerialization(func(p absser.Parsable, sw absser.SerializationWriter) error { startCalled = true; return nil }))
+		require.NoError(t, w.WriteObjectValue("key", absser.NewUntypedString("hello")))
+		assert.False(t, startCalled)
+	})
+}
+
+func TestFormSerialization_RepeatedFieldsRoundTrip(t *testing.T) {
+	t.Run("repeated keys round trip faithfully", func(t *testing.T) {
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"tags":        absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("golang"), absser.NewUntypedString("kiota"), absser.NewUntypedString("serialization")}),
+			"singleComma": absser.NewUntypedString("hello,world"),
+			"emptyStr":    absser.NewUntypedString(""),
+			"nullVal":     absser.NewUntypedNull(),
+			"numZero":     absser.NewUntypedInteger(0),
+			"numOne":      absser.NewUntypedInteger(1),
+			"zipCode":     absser.NewUntypedString("00123"),
+			"sciExp":      absser.NewUntypedDouble(0.01),
+		})
+		str := serializeUntyped(t, "", obj)
+		assert.Contains(t, str, "tags=golang")
+		assert.Contains(t, str, "tags=kiota")
+		assert.Contains(t, str, "tags=serialization")
+
+		pn, err := NewFormParseNode([]byte(str))
+		require.NoError(t, err)
+		res, err := pn.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		props := res.(*absser.UntypedObject).GetValue()
+
+		tagsArr := props["tags"].(*absser.UntypedArray).GetValue()
+		require.Len(t, tagsArr, 3)
+		assert.Equal(t, "golang", *tagsArr[0].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "kiota", *tagsArr[1].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "serialization", *tagsArr[2].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "hello,world", *props["singleComma"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "", *props["emptyStr"].(*absser.UntypedString).GetValue())
+		assert.NotNil(t, props["nullVal"].(*absser.UntypedNull))
+		assert.Equal(t, int32(0), *props["numZero"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, int32(1), *props["numOne"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, "00123", *props["zipCode"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, 0.01, *props["sciExp"].(*absser.UntypedDouble).GetValue())
+	})
+}
+
+func TestFormSerialization_UntypedWriterEdgeCases(t *testing.T) {
+	t.Run("formats whole-valued untyped floats with decimal point to prevent type loss", func(t *testing.T) {
+		str := serializeUntyped(t, "", absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"flt": absser.NewUntypedFloat(42.0),
+			"dbl": absser.NewUntypedDouble(100.0),
+		}))
+		assert.Contains(t, str, "flt=42.0")
+		assert.Contains(t, str, "dbl=100.0")
+
+		pn, err := NewFormParseNode([]byte(str))
+		require.NoError(t, err)
+		res, err := pn.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		props := res.(*absser.UntypedObject).GetValue()
+		assert.Equal(t, float64(42.0), *props["flt"].(*absser.UntypedDouble).GetValue())
+		assert.Equal(t, float64(100.0), *props["dbl"].(*absser.UntypedDouble).GetValue())
+	})
+
+	t.Run("rejects UntypedArray with fewer than 2 elements", func(t *testing.T) {
+		assert.ErrorContains(t, serializeUntypedError(t, "items", absser.NewUntypedArray([]absser.UntypedNodeable{})), "untyped arrays with fewer than 2 elements are not supported")
+		assert.ErrorContains(t, serializeUntypedError(t, "items", absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("onlyOne")})), "untyped arrays with fewer than 2 elements are not supported")
+	})
+
+	t.Run("serializes nil array elements as explicit null", func(t *testing.T) {
+		arr := absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("first"), nil, absser.NewUntypedString("third")})
+		assert.Equal(t, "items=first&items=null&items=third", serializeUntyped(t, "items", arr))
+	})
+
+	t.Run("rejects nested UntypedArray inside UntypedArray", func(t *testing.T) {
+		inner := absser.NewUntypedArray([]absser.UntypedNodeable{absser.NewUntypedString("a"), absser.NewUntypedString("b")})
+		arr := absser.NewUntypedArray([]absser.UntypedNodeable{inner, absser.NewUntypedString("c")})
+		assert.ErrorContains(t, serializeUntypedError(t, "items", arr), "nested collections serialization is not supported")
+	})
+
+	t.Run("rejects empty or whitespace-padded property names in UntypedObject", func(t *testing.T) {
+		for _, name := range []string{"", "  ", " padded", "padded "} {
+			err := serializeUntypedError(t, "", absser.NewUntypedObject(map[string]absser.UntypedNodeable{name: absser.NewUntypedString("val")}))
+			assert.ErrorContains(t, err, "empty or whitespace-padded property names are not supported")
+		}
+	})
+
+	t.Run("rejects non-finite untyped floats and doubles", func(t *testing.T) {
+		for _, node := range []absser.UntypedNodeable{
+			absser.NewUntypedDouble(math.NaN()),
+			absser.NewUntypedDouble(math.Inf(1)),
+			absser.NewUntypedDouble(math.Inf(-1)),
+			absser.NewUntypedFloat(float32(math.NaN())),
+			absser.NewUntypedFloat(float32(math.Inf(1))),
+		} {
+			assert.ErrorContains(t, serializeUntypedError(t, "", absser.NewUntypedObject(map[string]absser.UntypedNodeable{"val": node})), "non-finite float values are not supported")
+		}
+	})
+
+	t.Run("omits nil typed objects while emitting explicit UntypedNull", func(t *testing.T) {
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		require.NoError(t, w.WriteObjectValue("nilTyped", nil))
+		require.NoError(t, w.WriteObjectValue("nilUntyped", absser.NewUntypedNull()))
+		content, err := w.GetSerializedContent()
+		require.NoError(t, err)
+		assert.Equal(t, "nilUntyped=null", string(content))
+	})
+
+	t.Run("rejects merging root untyped scalars with entities or other values", func(t *testing.T) {
+		id := "e1"
+		entity := internal.NewTestEntity()
+		entity.SetId(&id)
+		assert.ErrorContains(t, serializeUntypedError(t, "", absser.NewUntypedString("str"), entity), "merging root untyped scalars is not supported")
+	})
+
+	t.Run("serializes UntypedObject and AdditionalData keys in deterministic sorted order", func(t *testing.T) {
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"z": absser.NewUntypedString("1"),
+			"a": absser.NewUntypedString("2"),
+			"m": absser.NewUntypedString("3"),
+		})
+		assert.Equal(t, "a=2&m=3&z=1", serializeUntyped(t, "", obj))
+
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		require.NoError(t, w.WriteAdditionalData(map[string]interface{}{"z": "1", "a": "2", "m": "3"}))
+		content, _ := w.GetSerializedContent()
+		assert.Equal(t, "a=2&m=3&z=1", string(content))
+	})
 }

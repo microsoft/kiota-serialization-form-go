@@ -4,22 +4,26 @@ package formserialization
 import (
 	"encoding/base64"
 	"errors"
-	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"math"
 	"math/big"
 	"net/url"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	abstractions "github.com/microsoft/kiota-abstractions-go"
 	absser "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 // FormParseNode is a ParseNode implementation for URI form encoded.
 type FormParseNode struct {
 	value                     string
+	values                    []string
 	fields                    map[string]string
+	rawFieldValues            map[string][]string
 	onBeforeAssignFieldValues absser.ParsableAction
 	onAfterAssignFieldValues  absser.ParsableAction
 }
@@ -30,19 +34,21 @@ func NewFormParseNode(content []byte) (*FormParseNode, error) {
 		return nil, errors.New("content is empty")
 	}
 	rawValue := string(content)
-	fields, err := loadFields(rawValue)
+	fields, rawFieldValues, err := loadFields(rawValue)
 	if err != nil {
 		return nil, err
 	}
 	return &FormParseNode{
-		value:  rawValue,
-		fields: fields,
+		value:          rawValue,
+		fields:         fields,
+		rawFieldValues: rawFieldValues,
 	}, nil
 }
-func loadFields(value string) (map[string]string, error) {
+func loadFields(value string) (map[string]string, map[string][]string, error) {
 	result := make(map[string]string)
+	rawResult := make(map[string][]string)
 	if len(value) == 0 {
-		return result, nil
+		return result, rawResult, nil
 	}
 	parts := strings.Split(value, "&")
 	for _, part := range parts {
@@ -50,11 +56,12 @@ func loadFields(value string) (map[string]string, error) {
 		if len(keyValue) == 2 {
 			key, err := sanitizeKey(keyValue[0])
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if key == "" {
 				continue
 			}
+			rawResult[key] = append(rawResult[key], keyValue[1])
 			if _, exists := result[key]; !exists {
 				result[key] = keyValue[1]
 			} else {
@@ -62,7 +69,7 @@ func loadFields(value string) (map[string]string, error) {
 			}
 		}
 	}
-	return result, nil
+	return result, rawResult, nil
 }
 func sanitizeKey(key string) (string, error) {
 	if key == "" {
@@ -84,7 +91,8 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 	if trimmedIndex == "" {
 		return nil, errors.New("index is empty")
 	}
-	fieldValue, ok := n.fields[trimmedIndex]
+	matchedKey := trimmedIndex
+	fieldValue, ok := n.fields[matchedKey]
 	if !ok {
 		key, err := sanitizeKey(trimmedIndex)
 		if err != nil {
@@ -93,18 +101,32 @@ func (n *FormParseNode) GetChildNode(index string) (absser.ParseNode, error) {
 		if key == "" {
 			return nil, errors.New("index is empty")
 		}
-		fieldValue, ok = n.fields[key]
+		matchedKey = key
+		fieldValue, ok = n.fields[matchedKey]
 	}
 	if !ok {
 		return nil, nil
 	}
 
+	var rawVals []string
+	if n.rawFieldValues != nil {
+		rawVals = n.rawFieldValues[matchedKey]
+	}
+
 	node := &FormParseNode{
 		value:                     fieldValue,
+		values:                    rawVals,
 		onBeforeAssignFieldValues: n.GetOnBeforeAssignFieldValues(),
 		onAfterAssignFieldValues:  n.GetOnAfterAssignFieldValues(),
 	}
 	return node, nil
+}
+
+func isUntypedDiscriminator(ctor absser.ParsableFactory) bool {
+	if ctor == nil {
+		return false
+	}
+	return reflect.ValueOf(ctor).Pointer() == reflect.ValueOf(absser.CreateUntypedNodeFromDiscriminatorValue).Pointer()
 }
 
 // GetObjectValue returns the Parsable value from the node.
@@ -112,12 +134,38 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 	if ctor == nil {
 		return nil, errors.New("constructor is nil")
 	}
-	if n == nil || isNullOrEmptyNode(n.value) {
+	if n == nil {
+		return nil, nil
+	}
+	if isNullOrEmptyNode(n.value) {
+		if isUntypedDiscriminator(ctor) {
+			return n.getUntypedValue()
+		}
+		var isUntyped bool
+		func() {
+			defer func() {
+				_ = recover()
+			}()
+			if res, err := ctor(n); err == nil && res != nil {
+				if _, ok := res.(absser.UntypedNodeable); ok {
+					isUntyped = true
+				}
+			}
+		}()
+		if isUntyped {
+			return n.getUntypedValue()
+		}
 		return nil, nil
 	}
 	result, err := ctor(n)
 	if err != nil {
 		return nil, err
+	}
+	if _, isUntypedNode := result.(absser.UntypedNodeable); isUntypedNode {
+		return n.getUntypedValue()
+	}
+	if result == nil {
+		return nil, nil
 	}
 	abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), result)
 	fields := result.GetFieldDeserializers()
@@ -132,7 +180,14 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 			}
 		}
 
-		for key, value := range n.fields {
+		keys := make([]string, 0, len(n.fields))
+		for k := range n.fields {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			value := n.fields[key]
 			field := fields[key]
 			if field == nil {
 				if value != "" && isHolder {
@@ -158,6 +213,206 @@ func (n *FormParseNode) GetObjectValue(ctor absser.ParsableFactory) (absser.Pars
 	}
 	abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), result)
 	return result, nil
+}
+
+func isCanonicalInteger(s string) bool {
+	if s == "0" {
+		return true
+	}
+	if len(s) == 0 {
+		return false
+	}
+	raw := s
+	if raw[0] == '-' {
+		raw = raw[1:]
+	}
+	if len(raw) == 0 || raw[0] < '1' || raw[0] > '9' {
+		return false
+	}
+	for i := 1; i < len(raw); i++ {
+		if raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isCanonicalFloat(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	if s[0] == '+' {
+		return false
+	}
+	raw := s
+	if raw[0] == '-' {
+		raw = raw[1:]
+	}
+	if len(raw) == 0 {
+		return false
+	}
+
+	i := 0
+	if raw[0] == '0' {
+		i = 1
+	} else if raw[0] >= '1' && raw[0] <= '9' {
+		i = 1
+		for i < len(raw) && raw[i] >= '0' && raw[i] <= '9' {
+			i++
+		}
+	} else {
+		return false
+	}
+
+	hasDot := false
+	hasExp := false
+
+	if i < len(raw) && raw[i] == '.' {
+		hasDot = true
+		i++
+		if i >= len(raw) || raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+		for i < len(raw) && raw[i] >= '0' && raw[i] <= '9' {
+			i++
+		}
+	}
+
+	if i < len(raw) && (raw[i] == 'e' || raw[i] == 'E') {
+		hasExp = true
+		i++
+		if i < len(raw) && (raw[i] == '+' || raw[i] == '-') {
+			i++
+		}
+		if i >= len(raw) || raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+		for i < len(raw) && raw[i] >= '0' && raw[i] <= '9' {
+			i++
+		}
+	}
+
+	return i == len(raw) && (hasDot || hasExp)
+}
+
+func isZeroMantissa(s string) bool {
+	mantissa := s
+	if idx := strings.IndexAny(s, "eE"); idx != -1 {
+		mantissa = s[:idx]
+	}
+	for i := 0; i < len(mantissa); i++ {
+		c := mantissa[i]
+		if c >= '1' && c <= '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
+	if len(n.values) > 1 {
+		elements := make([]absser.UntypedNodeable, len(n.values))
+		for i, rawVal := range n.values {
+			child := &FormParseNode{
+				value: rawVal,
+			}
+			untypedChild, err := child.getUntypedValue()
+			if err != nil {
+				return nil, err
+			}
+			if un, ok := untypedChild.(absser.UntypedNodeable); ok {
+				elements[i] = un
+			} else {
+				elements[i] = absser.NewUntypedNull()
+			}
+		}
+		arr := absser.NewUntypedArray(elements)
+		return arr, nil
+	}
+
+	if len(n.fields) > 0 {
+		properties := make(map[string]absser.UntypedNodeable)
+		untypedObj := absser.NewUntypedObject(properties)
+		abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), untypedObj)
+		keys := make([]string, 0, len(n.fields))
+		for k := range n.fields {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			childNode, err := n.GetChildNode(key)
+			if err != nil {
+				return nil, err
+			}
+			if childNode == nil {
+				properties[key] = absser.NewUntypedNull()
+				continue
+			}
+			cfn, ok := childNode.(*FormParseNode)
+			if !ok {
+				properties[key] = absser.NewUntypedNull()
+				continue
+			}
+			untypedChild, err := cfn.getUntypedValue()
+			if err != nil {
+				return nil, err
+			}
+			if un, ok := untypedChild.(absser.UntypedNodeable); ok {
+				properties[key] = un
+			} else {
+				properties[key] = absser.NewUntypedNull()
+			}
+		}
+		abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), untypedObj)
+		return untypedObj, nil
+	}
+
+	decoded, err := url.QueryUnescape(n.value)
+	if err != nil {
+		return nil, err
+	}
+
+	// Preserve decoded string when it has leading or trailing whitespace instead of coercing to bool, number, or null
+	if strings.TrimSpace(decoded) != decoded {
+		return absser.NewUntypedString(decoded), nil
+	}
+
+	if isNullValue(decoded) {
+		return absser.NewUntypedNull(), nil
+	}
+
+	trimmed := decoded
+	if strings.EqualFold(trimmed, "true") {
+		b := true
+		return absser.NewUntypedBoolean(b), nil
+	}
+	if strings.EqualFold(trimmed, "false") {
+		b := false
+		return absser.NewUntypedBoolean(b), nil
+	}
+
+	if isCanonicalInteger(trimmed) {
+		if i32, err := strconv.ParseInt(trimmed, 10, 32); err == nil {
+			v32 := int32(i32)
+			return absser.NewUntypedInteger(v32), nil
+		}
+		if i64, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+			longNode := absser.NewUntypedLong(i64)
+			return longNode, nil
+		}
+		// Integer token out of int64 range: preserve as UntypedString without float precision loss
+		return absser.NewUntypedString(decoded), nil
+	}
+
+	if isCanonicalFloat(trimmed) {
+		if f64, err := strconv.ParseFloat(trimmed, 64); err == nil && !math.IsNaN(f64) && !math.IsInf(f64, 0) {
+			if f64 != 0 || isZeroMantissa(trimmed) {
+				return absser.NewUntypedDouble(f64), nil
+			}
+		}
+	}
+
+	return absser.NewUntypedString(decoded), nil
 }
 
 // GetCollectionOfObjectValues returns the collection of Parsable values from the node.
