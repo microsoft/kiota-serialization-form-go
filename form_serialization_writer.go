@@ -283,6 +283,31 @@ func isNil(val any) bool {
 	}
 }
 
+func isAmbiguousUntypedString(s string) bool {
+	if strings.TrimSpace(s) != s || s == "" {
+		return false
+	}
+	if strings.EqualFold(s, "null") {
+		return true
+	}
+	if strings.EqualFold(s, "true") || strings.EqualFold(s, "false") {
+		return true
+	}
+	if isCanonicalInteger(s) {
+		if _, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return true
+		}
+	}
+	if isCanonicalFloat(s) {
+		if f64, err := strconv.ParseFloat(s, 64); err == nil && !math.IsNaN(f64) && !math.IsInf(f64, 0) {
+			if f64 != 0 || isZeroMantissa(s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func formatUntypedFloat(f float64, bitSize int) (string, error) {
 	if math.IsNaN(f) || math.IsInf(f, 0) {
 		return "", errors.New("non-finite float values are not supported in form URL-encoded serialization")
@@ -372,7 +397,14 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 			case *absser.UntypedNull:
 				writeErr = w.WriteNullValue(key)
 			case *absser.UntypedString:
-				writeErr = w.WriteStringValue(key, value.GetValue())
+				if v := value.GetValue(); v != nil {
+					if isAmbiguousUntypedString(*v) {
+						return errors.New("ambiguous untyped string values resembling primitives are not supported with FormSerializationWriter")
+					}
+					writeErr = w.WriteStringValue(key, v)
+				} else {
+					writeErr = w.WriteNullValue(key)
+				}
 			case *absser.UntypedArray:
 				if key == "" {
 					return errors.New("collections serialization is not supported with FormSerializationWriter")
@@ -418,6 +450,13 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 						if propKey == "" || strings.TrimSpace(propKey) != propKey {
 							return errors.New("empty or whitespace-padded property names are not supported with FormSerializationWriter")
 						}
+						if propVal == nil || isNil(propVal) {
+							err := w.WriteNullValue(propKey)
+							if err != nil {
+								return err
+							}
+							continue
+						}
 						err := w.WriteObjectValue(propKey, propVal)
 						if err != nil {
 							return err
@@ -426,9 +465,7 @@ func (w *FormSerializationWriter) WriteObjectValue(key string, item absser.Parsa
 				}
 				abstractions.InvokeParsableAction(w.GetOnAfterObjectSerialization(), val)
 			default:
-				if key != "" {
-					return errors.New("nested objects serialization is not supported with FormSerializationWriter")
-				}
+				return errors.New("unsupported untyped node type for FormSerializationWriter")
 			}
 			if writeErr != nil {
 				return writeErr
@@ -617,7 +654,12 @@ func (w *FormSerializationWriter) WriteAdditionalData(value map[string]interface
 			input := value[key]
 			var err error
 			switch value := input.(type) {
+			case *absser.UntypedArray:
+				return errors.New("untyped arrays in additional data are not supported with FormSerializationWriter")
 			case absser.Parsable:
+				if _, isArr := value.(*absser.UntypedArray); isArr {
+					return errors.New("untyped arrays in additional data are not supported with FormSerializationWriter")
+				}
 				err = w.WriteObjectValue(key, value)
 			case []absser.Parsable:
 				err = w.WriteCollectionOfObjectValues(key, value)

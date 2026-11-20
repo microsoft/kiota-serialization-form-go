@@ -1517,16 +1517,72 @@ func TestFormSerialization_UntypedWriterEdgeCases(t *testing.T) {
 
 	t.Run("serializes UntypedObject and AdditionalData keys in deterministic sorted order", func(t *testing.T) {
 		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
-			"z": absser.NewUntypedString("1"),
-			"a": absser.NewUntypedString("2"),
-			"m": absser.NewUntypedString("3"),
+			"z": absser.NewUntypedString("val1"),
+			"a": absser.NewUntypedString("val2"),
+			"m": absser.NewUntypedString("val3"),
 		})
-		assert.Equal(t, "a=2&m=3&z=1", serializeUntyped(t, "", obj))
+		assert.Equal(t, "a=val2&m=val3&z=val1", serializeUntyped(t, "", obj))
 
 		w := NewFormSerializationWriter()
 		defer w.Close()
-		require.NoError(t, w.WriteAdditionalData(map[string]interface{}{"z": "1", "a": "2", "m": "3"}))
+		require.NoError(t, w.WriteAdditionalData(map[string]interface{}{"z": "val1", "a": "val2", "m": "val3"}))
 		content, _ := w.GetSerializedContent()
-		assert.Equal(t, "a=2&m=3&z=1", string(content))
+		assert.Equal(t, "a=val2&m=val3&z=val1", string(content))
 	})
+
+	t.Run("rejects ambiguous untyped strings that resemble primitives", func(t *testing.T) {
+		ambiguous := []string{"null", "NULL", "true", "TRUE", "false", "FALSE", "42", "-17", "1.20", "0.0", "-0.0"}
+		for _, s := range ambiguous {
+			w := NewFormSerializationWriter()
+			err := w.WriteObjectValue("key", absser.NewUntypedString(s))
+			assert.ErrorContains(t, err, "ambiguous untyped string values resembling primitives are not supported")
+			w.Close()
+
+			obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+				"key": absser.NewUntypedString(s),
+			})
+			assert.ErrorContains(t, serializeUntypedError(t, "", obj), "ambiguous untyped string values resembling primitives are not supported")
+		}
+
+		nonAmbiguous := []string{"hello", "nullify", "true_val", " 42 ", "001.20", "+1.5"}
+		for _, s := range nonAmbiguous {
+			w := NewFormSerializationWriter()
+			err := w.WriteObjectValue("key", absser.NewUntypedString(s))
+			assert.NoError(t, err)
+			w.Close()
+		}
+	})
+
+	t.Run("rejects unrecognized untyped nodes with unsupported-type error", func(t *testing.T) {
+		dummy := &customUntypedNode{UntypedNodeable: absser.NewUntypedString("sample")}
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		err := w.WriteObjectValue("", dummy)
+		assert.ErrorContains(t, err, "unsupported untyped node type for FormSerializationWriter")
+	})
+
+	t.Run("rejects untyped arrays in WriteAdditionalData", func(t *testing.T) {
+		arr := absser.NewUntypedArray([]absser.UntypedNodeable{
+			absser.NewUntypedString("val1"),
+			absser.NewUntypedString("val2"),
+		})
+		w := NewFormSerializationWriter()
+		defer w.Close()
+		err := w.WriteAdditionalData(map[string]interface{}{"tags": arr})
+		assert.ErrorContains(t, err, "untyped arrays in additional data are not supported with FormSerializationWriter")
+	})
+
+	t.Run("serializes nil and typed-nil properties in UntypedObject as null tokens", func(t *testing.T) {
+		var typedNilStr *absser.UntypedString
+		obj := absser.NewUntypedObject(map[string]absser.UntypedNodeable{
+			"a": nil,
+			"b": typedNilStr,
+			"c": absser.NewUntypedString("val"),
+		})
+		assert.Equal(t, "a=null&b=null&c=val", serializeUntyped(t, "", obj))
+	})
+}
+
+type customUntypedNode struct {
+	absser.UntypedNodeable
 }

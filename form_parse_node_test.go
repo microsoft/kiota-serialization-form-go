@@ -1786,16 +1786,26 @@ func TestFormParseNode_NumericAndBooleanInferencePrecision(t *testing.T) {
 }
 
 func TestFormParseNode_UntypedAssignmentCallbacks(t *testing.T) {
-	beforeCalls, afterCalls := 0, 0
+	var beforeItems, afterItems []absser.Parsable
 	node, err := NewFormParseNode([]byte("key=val"))
 	require.NoError(t, err)
-	node.onBeforeAssignFieldValues = func(p absser.Parsable) error { beforeCalls++; return nil }
-	node.onAfterAssignFieldValues = func(p absser.Parsable) error { afterCalls++; return nil }
+	node.onBeforeAssignFieldValues = func(p absser.Parsable) error {
+		beforeItems = append(beforeItems, p)
+		return nil
+	}
+	node.onAfterAssignFieldValues = func(p absser.Parsable) error {
+		afterItems = append(afterItems, p)
+		return nil
+	}
 	res, err := node.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
-	assert.Equal(t, 1, beforeCalls)
-	assert.Equal(t, 1, afterCalls)
+	assert.Len(t, beforeItems, 2)
+	assert.Len(t, afterItems, 2)
+	assert.IsType(t, &absser.UntypedObject{}, beforeItems[0])
+	assert.IsType(t, &absser.UntypedString{}, beforeItems[1])
+	assert.IsType(t, &absser.UntypedString{}, afterItems[0])
+	assert.IsType(t, &absser.UntypedObject{}, afterItems[1])
 }
 
 func TestFormParseNode_ChildNodePropagatesCallbacksForTypedObjects(t *testing.T) {
@@ -1893,5 +1903,58 @@ func TestFormParseNode_UntypedNullWhitespaceAndFloatUnderflow(t *testing.T) {
 		props := parseUntyped(t, "underflow=1e-325&zero=0.0")
 		assert.Equal(t, "1e-325", *props["underflow"].(*absser.UntypedString).GetValue())
 		assert.Equal(t, 0.0, *props["zero"].(*absser.UntypedDouble).GetValue())
+	})
+}
+
+func TestFormParseNode_UntypedAssignmentCallbacks_RepeatedAndScalars(t *testing.T) {
+	t.Run("invokes callbacks on untyped array and each element for repeated fields", func(t *testing.T) {
+		var beforeItems, afterItems []absser.Parsable
+		node, err := NewFormParseNode([]byte("tags=first&tags=second"))
+		require.NoError(t, err)
+		node.onBeforeAssignFieldValues = func(p absser.Parsable) error {
+			beforeItems = append(beforeItems, p)
+			return nil
+		}
+		node.onAfterAssignFieldValues = func(p absser.Parsable) error {
+			afterItems = append(afterItems, p)
+			return nil
+		}
+		res, err := node.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+
+		assert.Len(t, beforeItems, 4)
+		assert.Len(t, afterItems, 4)
+		assert.IsType(t, &absser.UntypedObject{}, beforeItems[0])
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[1])
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[2])
+		assert.IsType(t, &absser.UntypedArray{}, beforeItems[3])
+
+		assert.IsType(t, &absser.UntypedString{}, afterItems[0])
+		assert.IsType(t, &absser.UntypedString{}, afterItems[1])
+		assert.IsType(t, &absser.UntypedArray{}, afterItems[2])
+		assert.IsType(t, &absser.UntypedObject{}, afterItems[3])
+	})
+
+	t.Run("invokes callbacks on direct scalar untyped node", func(t *testing.T) {
+		var beforeItems, afterItems []absser.Parsable
+		node := &FormParseNode{
+			value: "hello",
+			onBeforeAssignFieldValues: func(p absser.Parsable) error {
+				beforeItems = append(beforeItems, p)
+				return nil
+			},
+			onAfterAssignFieldValues: func(p absser.Parsable) error {
+				afterItems = append(afterItems, p)
+				return nil
+			},
+		}
+		res, err := node.getUntypedValue()
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Len(t, beforeItems, 1)
+		assert.Len(t, afterItems, 1)
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[0])
+		assert.IsType(t, &absser.UntypedString{}, afterItems[0])
 	})
 }

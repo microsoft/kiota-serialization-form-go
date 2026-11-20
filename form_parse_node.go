@@ -314,7 +314,9 @@ func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
 		elements := make([]absser.UntypedNodeable, len(n.values))
 		for i, rawVal := range n.values {
 			child := &FormParseNode{
-				value: rawVal,
+				value:                     rawVal,
+				onBeforeAssignFieldValues: n.GetOnBeforeAssignFieldValues(),
+				onAfterAssignFieldValues:  n.GetOnAfterAssignFieldValues(),
 			}
 			untypedChild, err := child.getUntypedValue()
 			if err != nil {
@@ -327,6 +329,8 @@ func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
 			}
 		}
 		arr := absser.NewUntypedArray(elements)
+		abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), arr)
+		abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), arr)
 		return arr, nil
 	}
 
@@ -367,6 +371,16 @@ func (n *FormParseNode) getUntypedValue() (absser.Parsable, error) {
 		return untypedObj, nil
 	}
 
+	scalarNode, err := n.getUntypedScalarValue()
+	if err != nil || scalarNode == nil {
+		return scalarNode, err
+	}
+	abstractions.InvokeParsableAction(n.GetOnBeforeAssignFieldValues(), scalarNode)
+	abstractions.InvokeParsableAction(n.GetOnAfterAssignFieldValues(), scalarNode)
+	return scalarNode, nil
+}
+
+func (n *FormParseNode) getUntypedScalarValue() (absser.Parsable, error) {
 	decoded, err := url.QueryUnescape(n.value)
 	if err != nil {
 		return nil, err
