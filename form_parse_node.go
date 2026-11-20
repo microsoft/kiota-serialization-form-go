@@ -240,10 +240,16 @@ func (n *FormParseNode) GetCollectionOfEnumValues(parser absser.EnumFactory) ([]
 	rawValues := strings.Split(n.value, ",")
 	result := make([]interface{}, len(rawValues))
 	for i, rawValue := range rawValues {
-		node := &FormParseNode{
-			value: rawValue,
+		decoded, err := url.QueryUnescape(rawValue)
+		if err != nil {
+			return nil, err
 		}
-		val, err := node.GetEnumValue(parser)
+		trimmed := strings.TrimSpace(decoded)
+		if trimmed == "" || isNullValue(trimmed) {
+			result[i] = nil
+			continue
+		}
+		val, err := parser(trimmed)
 		if err != nil {
 			return nil, err
 		}
@@ -600,7 +606,23 @@ func getByteArrayValue(value string) ([]byte, error) {
 	if trimmed == "" {
 		return nil, nil
 	}
-	return base64.StdEncoding.DecodeString(trimmed)
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, err = base64.RawStdEncoding.DecodeString(trimmed)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, err = base64.URLEncoding.DecodeString(trimmed)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, err = base64.RawURLEncoding.DecodeString(trimmed)
+	if err == nil {
+		return decoded, nil
+	}
+	return nil, err
 }
 
 // GetRawValue returns a pointer to the raw string value from the node, or nil if the node is empty or null.

@@ -1,13 +1,16 @@
 package formserialization
 
 import (
+	"encoding/base64"
 	"errors"
-	"github.com/google/uuid"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math"
+	"net/url"
 	"strconv"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 
 	"github.com/microsoft/kiota-serialization-form-go/internal"
 
@@ -1677,4 +1680,123 @@ func TestFormParseNode_GetChildNode_LiteralUnescapedKeyCharacters(t *testing.T) 
 	require.Error(t, err)
 	assert.Nil(t, invalidChild)
 }
+
+func TestFormParseNode_GetByteArrayValue_Base64Variants(t *testing.T) {
+	// Payload of 2 bytes produces padding in standard Base64: 2 bytes -> 3 chars + 1 '=' padding.
+	// Contains bits that map to '+' and '/' in standard, and '-' and '_' in URL-safe.
+	expected := []byte{0xfb, 0xff}
+	stdPadded := base64.StdEncoding.EncodeToString(expected) // "+/8="
+	stdRaw := base64.RawStdEncoding.EncodeToString(expected) // "+/8"
+	urlPadded := base64.URLEncoding.EncodeToString(expected) // "-_8="
+	urlRaw := base64.RawURLEncoding.EncodeToString(expected) // "-_8"
+
+	t.Run("standard padded base64 query escaped", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("data=" + url.QueryEscape(stdPadded)))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("data")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+		bytes, err := child.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Equal(t, expected, bytes)
+	})
+
+	t.Run("standard raw unpadded base64 query escaped", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("data=" + url.QueryEscape(stdRaw)))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("data")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+		bytes, err := child.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Equal(t, expected, bytes)
+	})
+
+	t.Run("url-safe padded base64", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("data=" + urlPadded))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("data")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+		bytes, err := child.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Equal(t, expected, bytes)
+	})
+
+	t.Run("url-safe raw unpadded base64", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("data=" + urlRaw))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("data")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+		bytes, err := child.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Equal(t, expected, bytes)
+	})
+
+	t.Run("collection of mixed base64 formats", func(t *testing.T) {
+		payload := "items=" + url.QueryEscape(stdPadded) + "&items=" + url.QueryEscape(stdRaw) + "&items=" + urlRaw
+		node, err := NewFormParseNode([]byte(payload))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("items")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		for _, typeAlias := range []string{"base64", "[]byte", "bytearray", "binary"} {
+			vals, err := child.GetCollectionOfPrimitiveValues(typeAlias)
+			require.NoError(t, err)
+			require.Len(t, vals, 3)
+			assert.Equal(t, expected, vals[0].([]byte))
+			assert.Equal(t, expected, vals[1].([]byte))
+			assert.Equal(t, expected, vals[2].([]byte))
+		}
+	})
+
+	t.Run("empty and nil node returns nil", func(t *testing.T) {
+		var nilNode *FormParseNode
+		val, err := nilNode.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Nil(t, val)
+
+		emptyNode := &FormParseNode{value: ""}
+		val, err = emptyNode.GetByteArrayValue()
+		require.NoError(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("invalid base64 returns error", func(t *testing.T) {
+		node := &FormParseNode{value: "!!!not-valid-base64!!!"}
+		_, err := node.GetByteArrayValue()
+		assert.Error(t, err)
+	})
+}
+
+func TestFormParseNode_EnumCollectionWhitespaceAndNullTolerance(t *testing.T) {
+	t.Run("GetCollectionOfEnumValues with whitespace-padded tokens", func(t *testing.T) {
+		payload := "colors=red, blue,  green  "
+		node, err := NewFormParseNode([]byte(payload))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("colors")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		vals, err := child.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{testColorRed, testColorBlue, testColorGreen}, vals)
+	})
+
+	t.Run("GetCollectionOfEnumValues with empty and null elements", func(t *testing.T) {
+		payload := "colors=red,,blue, ,green,null"
+		node, err := NewFormParseNode([]byte(payload))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("colors")
+		require.NoError(t, err)
+		require.NotNil(t, child)
+
+		vals, err := child.GetCollectionOfEnumValues(testColorFactory)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{testColorRed, nil, testColorBlue, nil, testColorGreen, nil}, vals)
+	})
+}
+
 
