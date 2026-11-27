@@ -2,8 +2,8 @@ package formserialization
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"math"
 	"strconv"
@@ -398,12 +398,12 @@ func TestInt32ValuesRejectOutOfRangeIntegers(t *testing.T) {
 
 func TestInt64ValuePreservesNumericCoercion(t *testing.T) {
 	for value, expected := range map[string]int64{
-		"1.5": 1,
-		"-1.5": -1,
-		"1e3": 1000,
-		"-9223372036854775808e0": -9223372036854775808,
-		"9223372036854775807e0": 9223372036854775807,
-		"420000000000000000000e-10": 42000000000,
+		"1.5":                        1,
+		"-1.5":                       -1,
+		"1e3":                        1000,
+		"-9223372036854775808e0":     -9223372036854775808,
+		"9223372036854775807e0":      9223372036854775807,
+		"420000000000000000000e-10":  42000000000,
 		"-420000000000000000000e-10": -42000000000,
 	} {
 		t.Run(value, func(t *testing.T) {
@@ -625,7 +625,6 @@ func TestGetInt32Value(t *testing.T) {
 	})
 }
 
-
 func TestGetTimeValueWithSubsecondsAndWhitespace(t *testing.T) {
 	node, err := NewFormParseNode([]byte("t1=2020-12-31T23%3A59%3A59.123456789Z&t2=2020-12-31T23%3A59%3A59.999Z&t3=%202020-12-31T23%3A59%3A59Z%20"))
 	assert.NoError(t, err)
@@ -804,7 +803,6 @@ func TestGetCollectionOfPrimitiveValuesCaseInsensitiveAndWhitespace(t *testing.T
 	_, err = node.GetCollectionOfPrimitiveValues("   ")
 	assert.EqualError(t, err, "targetType is empty")
 }
-
 
 func TestEmptyFieldDeserializationDoesNotPanic(t *testing.T) {
 	node, err := NewFormParseNode([]byte("officeLocation=&id=48d31887-5fad-4d73-a9f5-3c356e68a038"))
@@ -1678,3 +1676,285 @@ func TestFormParseNode_GetChildNode_LiteralUnescapedKeyCharacters(t *testing.T) 
 	assert.Nil(t, invalidChild)
 }
 
+func parseUntyped(t *testing.T, payload string) map[string]absser.UntypedNodeable {
+	t.Helper()
+	node, err := NewFormParseNode([]byte(payload))
+	require.NoError(t, err)
+	res, err := node.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	untypedObj, ok := res.(*absser.UntypedObject)
+	require.True(t, ok)
+	return untypedObj.GetValue()
+}
+
+func TestFormParseNode_GetObjectValue_UntypedNodes(t *testing.T) {
+	t.Run("parses form fields into UntypedObject", func(t *testing.T) {
+		props := parseUntyped(t, "title=Hello+World&count=42&active=true&score=98.5&empty=null")
+		assert.Equal(t, "Hello World", *props["title"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, int32(42), *props["count"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, true, *props["active"].(*absser.UntypedBoolean).GetValue())
+		assert.Equal(t, 98.5, *props["score"].(*absser.UntypedDouble).GetValue())
+		assert.NotNil(t, props["empty"].(*absser.UntypedNull))
+	})
+
+	t.Run("parses scalar child node into untyped primitive", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("count=42&active=true"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("count")
+		require.NoError(t, err)
+		val, err := child.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		assert.Equal(t, int32(42), *val.(*absser.UntypedInteger).GetValue())
+	})
+}
+
+func TestFormParseNode_RepeatedFieldsAndScalarCommas(t *testing.T) {
+	t.Run("parses repeated keys into UntypedArray", func(t *testing.T) {
+		props := parseUntyped(t, "tag=first&tag=second&tag=third")
+		arr, ok := props["tag"].(*absser.UntypedArray)
+		require.True(t, ok)
+		require.Len(t, arr.GetValue(), 3)
+		assert.Equal(t, "first", *arr.GetValue()[0].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "second", *arr.GetValue()[1].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "third", *arr.GetValue()[2].(*absser.UntypedString).GetValue())
+	})
+
+	t.Run("preserves commas in scalar strings", func(t *testing.T) {
+		props := parseUntyped(t, "filter=status,active&msg=hello%2Cworld")
+		assert.Equal(t, "status,active", *props["filter"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "hello,world", *props["msg"].(*absser.UntypedString).GetValue())
+	})
+}
+
+func TestFormParseNode_EmptyStringsAndNullHandling(t *testing.T) {
+	t.Run("empty string preserves UntypedString without becoming UntypedNull", func(t *testing.T) {
+		props := parseUntyped(t, "name=&nullVal=null")
+		strNode, ok := props["name"].(*absser.UntypedString)
+		require.True(t, ok)
+		assert.Equal(t, "", *strNode.GetValue())
+		_, okNull := props["nullVal"].(*absser.UntypedNull)
+		assert.True(t, okNull)
+	})
+
+	t.Run("child GetObjectValue with empty string returns UntypedString", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("name="))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("name")
+		require.NoError(t, err)
+		res, err := child.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		strNode, ok := res.(*absser.UntypedString)
+		require.True(t, ok)
+		assert.Equal(t, "", *strNode.GetValue())
+	})
+
+	t.Run("missing field returns nil without error", func(t *testing.T) {
+		node, err := NewFormParseNode([]byte("name=test"))
+		require.NoError(t, err)
+		child, err := node.GetChildNode("missing")
+		require.NoError(t, err)
+		assert.Nil(t, child)
+	})
+}
+
+func TestFormParseNode_NumericAndBooleanInferencePrecision(t *testing.T) {
+	t.Run("encoded exponents decoded before numeric inference", func(t *testing.T) {
+		props := parseUntyped(t, "val=1%65-2")
+		assert.Equal(t, 0.01, *props["val"].(*absser.UntypedDouble).GetValue())
+	})
+
+	t.Run("boolean inference does not capture 0 and 1", func(t *testing.T) {
+		props := parseUntyped(t, "zero=0&one=1&bTrue=true&bFalse=false")
+		assert.Equal(t, int32(0), *props["zero"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, int32(1), *props["one"].(*absser.UntypedInteger).GetValue())
+		assert.Equal(t, true, *props["bTrue"].(*absser.UntypedBoolean).GetValue())
+		assert.Equal(t, false, *props["bFalse"].(*absser.UntypedBoolean).GetValue())
+	})
+
+	t.Run("preserves noncanonical numeric strings with leading zeros", func(t *testing.T) {
+		props := parseUntyped(t, "zip=00123&num=000")
+		assert.Equal(t, "00123", *props["zip"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "000", *props["num"].(*absser.UntypedString).GetValue())
+	})
+
+	t.Run("out of range integers preserved without floating point precision loss", func(t *testing.T) {
+		props := parseUntyped(t, "big=9223372036854775808&neg=-9223372036854775809")
+		assert.Equal(t, "9223372036854775808", *props["big"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "-9223372036854775809", *props["neg"].(*absser.UntypedString).GetValue())
+	})
+}
+
+func TestFormParseNode_UntypedAssignmentCallbacks(t *testing.T) {
+	var beforeItems, afterItems []absser.Parsable
+	node, err := NewFormParseNode([]byte("key=val"))
+	require.NoError(t, err)
+	node.onBeforeAssignFieldValues = func(p absser.Parsable) error {
+		beforeItems = append(beforeItems, p)
+		return nil
+	}
+	node.onAfterAssignFieldValues = func(p absser.Parsable) error {
+		afterItems = append(afterItems, p)
+		return nil
+	}
+	res, err := node.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Len(t, beforeItems, 2)
+	assert.Len(t, afterItems, 2)
+	assert.IsType(t, &absser.UntypedObject{}, beforeItems[0])
+	assert.IsType(t, &absser.UntypedString{}, beforeItems[1])
+	assert.IsType(t, &absser.UntypedString{}, afterItems[0])
+	assert.IsType(t, &absser.UntypedObject{}, afterItems[1])
+}
+
+func TestFormParseNode_ChildNodePropagatesCallbacksForTypedObjects(t *testing.T) {
+	beforeCalls, afterCalls := 0, 0
+	node, err := NewFormParseNode([]byte("entity=id%3D123"))
+	require.NoError(t, err)
+	node.onBeforeAssignFieldValues = func(p absser.Parsable) error { beforeCalls++; return nil }
+	node.onAfterAssignFieldValues = func(p absser.Parsable) error { afterCalls++; return nil }
+	child, err := node.GetChildNode("entity")
+	require.NoError(t, err)
+	require.NotNil(t, child)
+	assert.NotNil(t, child.GetOnBeforeAssignFieldValues())
+	assert.NotNil(t, child.GetOnAfterAssignFieldValues())
+}
+
+func TestFormParseNode_DeterministicFieldAssignment(t *testing.T) {
+	props := parseUntyped(t, "z=1&a=2&m=3")
+	assert.Equal(t, int32(1), *props["z"].(*absser.UntypedInteger).GetValue())
+	assert.Equal(t, int32(2), *props["a"].(*absser.UntypedInteger).GetValue())
+	assert.Equal(t, int32(3), *props["m"].(*absser.UntypedInteger).GetValue())
+}
+
+func TestFormParseNode_TypedNullShortCircuit(t *testing.T) {
+	t.Run("typed object returns nil without firing callbacks on empty or null node", func(t *testing.T) {
+		failingCtor := func(parseNode absser.ParseNode) (absser.Parsable, error) {
+			return nil, errors.New("missing discriminator on null/empty node")
+		}
+		for _, ctor := range []absser.ParsableFactory{internal.CreateTestEntityFromDiscriminator, failingCtor} {
+			for _, raw := range []string{"", "null", "+"} {
+				node := &FormParseNode{value: raw}
+				res, err := node.GetObjectValue(ctor)
+				require.NoError(t, err)
+				assert.Nil(t, res)
+			}
+		}
+	})
+
+	t.Run("direct, wrapped, and custom untyped factories preserve empty, whitespace, and null values", func(t *testing.T) {
+		wrapped := func(pn absser.ParseNode) (absser.Parsable, error) {
+			return absser.CreateUntypedNodeFromDiscriminatorValue(pn)
+		}
+		custom := func(pn absser.ParseNode) (absser.Parsable, error) {
+			return absser.NewUntypedNode(nil), nil
+		}
+		root, err := NewFormParseNode([]byte("empty=&nullVal=null&plusVal=+"))
+		require.NoError(t, err)
+
+		for _, ctor := range []absser.ParsableFactory{absser.CreateUntypedNodeFromDiscriminatorValue, wrapped, custom} {
+			nullChild, _ := root.GetChildNode("nullVal")
+			resNull, err := nullChild.GetObjectValue(ctor)
+			require.NoError(t, err)
+			assert.IsType(t, &absser.UntypedNull{}, resNull)
+
+			emptyChild, _ := root.GetChildNode("empty")
+			resEmpty, err := emptyChild.GetObjectValue(ctor)
+			require.NoError(t, err)
+			assert.Equal(t, "", *resEmpty.(*absser.UntypedString).GetValue())
+
+			plusChild, _ := root.GetChildNode("plusVal")
+			resPlus, err := plusChild.GetObjectValue(ctor)
+			require.NoError(t, err)
+			assert.Equal(t, " ", *resPlus.(*absser.UntypedString).GetValue())
+		}
+	})
+}
+
+func TestFormParseNode_UntypedPreserveWhitespaceAndNonCanonicalFloat(t *testing.T) {
+	t.Run("preserves whitespace around strings without coercing to bool or number", func(t *testing.T) {
+		props := parseUntyped(t, "paddedInt=%2042%20&paddedBool=%20true%20&paddedFloat=%203.14%20&paddedStr=%20hello%20")
+		assert.Equal(t, " 42 ", *props["paddedInt"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, " true ", *props["paddedBool"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, " 3.14 ", *props["paddedFloat"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, " hello ", *props["paddedStr"].(*absser.UntypedString).GetValue())
+	})
+
+	t.Run("preserves non-canonical float representations as strings", func(t *testing.T) {
+		props := parseUntyped(t, "leadingZero=01.5&plusSign=%2B1.5&bareDot=.5&canonicalFloat=1.5&canonicalZero=0.5")
+		assert.Equal(t, "01.5", *props["leadingZero"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, "+1.5", *props["plusSign"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, ".5", *props["bareDot"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, 1.5, *props["canonicalFloat"].(*absser.UntypedDouble).GetValue())
+		assert.Equal(t, 0.5, *props["canonicalZero"].(*absser.UntypedDouble).GetValue())
+	})
+}
+
+func TestFormParseNode_UntypedNullWhitespaceAndFloatUnderflow(t *testing.T) {
+	t.Run("preserves whitespace around null strings without coercing to UntypedNull", func(t *testing.T) {
+		props := parseUntyped(t, "paddedNull1=+null+&paddedNull2=%20null%20&exactNull=null")
+		assert.Equal(t, " null ", *props["paddedNull1"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, " null ", *props["paddedNull2"].(*absser.UntypedString).GetValue())
+		assert.IsType(t, &absser.UntypedNull{}, props["exactNull"])
+	})
+
+	t.Run("preserves underflowing float tokens as UntypedString without precision loss to zero", func(t *testing.T) {
+		props := parseUntyped(t, "underflow=1e-325&zero=0.0")
+		assert.Equal(t, "1e-325", *props["underflow"].(*absser.UntypedString).GetValue())
+		assert.Equal(t, 0.0, *props["zero"].(*absser.UntypedDouble).GetValue())
+	})
+}
+
+func TestFormParseNode_UntypedAssignmentCallbacks_RepeatedAndScalars(t *testing.T) {
+	t.Run("invokes callbacks on untyped array and each element for repeated fields", func(t *testing.T) {
+		var beforeItems, afterItems []absser.Parsable
+		node, err := NewFormParseNode([]byte("tags=first&tags=second"))
+		require.NoError(t, err)
+		node.onBeforeAssignFieldValues = func(p absser.Parsable) error {
+			beforeItems = append(beforeItems, p)
+			return nil
+		}
+		node.onAfterAssignFieldValues = func(p absser.Parsable) error {
+			afterItems = append(afterItems, p)
+			return nil
+		}
+		res, err := node.GetObjectValue(absser.CreateUntypedNodeFromDiscriminatorValue)
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+
+		assert.Len(t, beforeItems, 4)
+		assert.Len(t, afterItems, 4)
+		assert.IsType(t, &absser.UntypedObject{}, beforeItems[0])
+		assert.IsType(t, &absser.UntypedArray{}, beforeItems[1])
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[2])
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[3])
+
+		assert.IsType(t, &absser.UntypedString{}, afterItems[0])
+		assert.IsType(t, &absser.UntypedString{}, afterItems[1])
+		assert.IsType(t, &absser.UntypedArray{}, afterItems[2])
+		assert.IsType(t, &absser.UntypedObject{}, afterItems[3])
+	})
+
+	t.Run("invokes callbacks on direct scalar untyped node", func(t *testing.T) {
+		var beforeItems, afterItems []absser.Parsable
+		node := &FormParseNode{
+			value: "hello",
+			onBeforeAssignFieldValues: func(p absser.Parsable) error {
+				beforeItems = append(beforeItems, p)
+				return nil
+			},
+			onAfterAssignFieldValues: func(p absser.Parsable) error {
+				afterItems = append(afterItems, p)
+				return nil
+			},
+		}
+		res, err := node.getUntypedValue()
+		require.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Len(t, beforeItems, 1)
+		assert.Len(t, afterItems, 1)
+		assert.IsType(t, &absser.UntypedString{}, beforeItems[0])
+		assert.IsType(t, &absser.UntypedString{}, afterItems[0])
+	})
+}
